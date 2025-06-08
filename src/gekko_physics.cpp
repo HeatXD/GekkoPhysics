@@ -14,7 +14,16 @@ namespace GekkoPhysics {
 	}
 
 	void World::RemoveBody(Identifier id) {
+		if (!_bodies.contains(id)) return;
+		auto& body = _bodies.get(id);
 
+		if (body._rel_shape_group_set != -1) {
+			auto& shape_group_set = _relations.get(body._rel_shape_group_set);
+			for (Identifier shape_group_id : shape_group_set.children) {
+				if (shape_group_id == -1) continue;
+				std::cout << shape_group_id << "\n";
+			}
+		}
 	}
 
 	void World::Save(MemStream& stream) {

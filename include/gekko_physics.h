@@ -14,16 +14,14 @@ namespace GekkoPhysics {
 	};
 
 	struct Shape {
+		Identifier _shape_id = -1;
 		enum Type : uint8_t {
 			None,
 			Sphere,
 		} type;
-	private:
-		Identifier _shape_id = -1;
 	};
 
 	struct ShapeGroup {
-	private:
 		Identifier _rel_shapes_set = -1;
 	};
 
@@ -31,7 +29,7 @@ namespace GekkoPhysics {
 		Vec3 position;
 		Vec3 velocity;
 		Vec3 acceleration;
-	private:
+
 		Identifier _rel_shape_group_set = -1;
 	};
 
