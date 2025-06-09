@@ -40,7 +40,7 @@ namespace GekkoPhysics {
 	}
 
 	Identifier World::AddShape(Identifier shape_group_id, Shape::Type shape_type) {
-		if (shape_type == Shape::Type::None || !_shape_groups.contains(shape_group_id)) {
+		if (shape_type == Shape::None || !_shape_groups.contains(shape_group_id)) {
 			return INVALID_ID;
 		}
 

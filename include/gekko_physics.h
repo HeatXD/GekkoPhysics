@@ -28,9 +28,9 @@ namespace GekkoPhysics {
 	};
 
 	struct Body {
-		Vec3 position;
-		Vec3 velocity;
-		Vec3 acceleration;
+		Vec3 position = {};
+		Vec3 velocity = {};
+		Vec3 acceleration = {};
 
 		Identifier link_shape_groups = INVALID_ID;
 	};
