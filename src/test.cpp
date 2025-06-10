@@ -23,6 +23,10 @@ int main()
         }
     }
 
+    for (Identifier i = 10; i < 60; i++) {
+        world1.RemoveBody(i);
+    }
+
     auto t0 = high_resolution_clock::now();
     world1.Save(stream2);
     auto t1 = high_resolution_clock::now();
@@ -39,5 +43,6 @@ int main()
     // Only print after all timing is done
     std::cout << "Save: " << save_us << " us\n";
     std::cout << "Load: " << load_us << " us\n";
+
     return 0;
 }

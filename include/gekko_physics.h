@@ -49,10 +49,14 @@ namespace GekkoPhysics {
 		SparseSet<Identifier, Sphere> _spheres;
 
 		Vec3 _origin = {}, _up = {};
+		Unit _update_rate { 60 };
 
 	public:
 		void SetOrientation(const Vec3& up);
 		void SetOrigin(const Vec3& origin);
+
+		// Sets the expected number of iterations per second (default 60)
+		void SetUpdateRate(const Unit& rate);
 
 		Identifier CreateBody();
 		// Adds a shapegroup to a body.
@@ -63,9 +67,12 @@ namespace GekkoPhysics {
 		Identifier AddShape(Identifier shape_group_id, Shape::Type shape_type);
 
 		void RemoveBody(Identifier id);
+		void RemoveShapeGroup(Identifier body_id, Identifier shape_group_id);
+		void RemoveShape(Identifier shape_group_id, Identifier shape_id);
 
 		void Save(MemStream& stream);
 		void Load(MemStream& stream);
+		void Advance();
 
 	private:
 		// Create a 1 to 8 link between entites.
