@@ -195,7 +195,12 @@ namespace GekkoPhysics {
 	}
 
 	void World::Advance() {
-		const Unit delta = 1 / _update_rate;
+		const Unit dt = 1 / _update_rate;
+		for (auto& body : _bodies) {
+			if (body.is_static) continue;
+			body.velocity += body.acceleration * dt;
+			body.position += body.velocity * dt;
+		}
 	}
 
 	Identifier World::CreateLink() {

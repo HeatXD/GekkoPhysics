@@ -32,6 +32,8 @@ namespace GekkoPhysics {
 		Vec3 velocity = {};
 		Vec3 acceleration = {};
 
+		bool is_static = false;
+
 		Identifier link_shape_groups = INVALID_ID;
 	};
 
