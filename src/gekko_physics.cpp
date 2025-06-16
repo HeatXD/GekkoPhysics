@@ -194,19 +194,25 @@ namespace GekkoPhysics {
 		std::memcpy(&_update_rate, data, out_size);
 	}
 
-	void World::Advance() {
+	void World::Update() {
 		const Unit dt = 1 / _update_rate;
 		for (auto& body : _bodies) {
 			if (body.is_static) continue;
 			body.velocity += body.acceleration * dt;
 			body.position += body.velocity * dt;
 		}
+
+		CheckCollisions();
 	}
 
 	Identifier World::CreateLink() {
 		auto link = L1T8();
 		link.Reset();
 		return _links.insert(link);
+	}
+
+	void World::CheckCollisions()
+	{
 	}
 
 	void L1T8::Reset() const {

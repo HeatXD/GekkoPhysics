@@ -2,12 +2,10 @@
 #include "gekko_math.h"
 #include "gekko_ds.h"
 #include "gekko_physics.h"
-using namespace GekkoPhysics;
 
 int main()
 {
-    using namespace GekkoDS;
-    using namespace GekkoMath;
+    using namespace GekkoPhysics;
     using namespace std::chrono;
 
     World world1, world2;
@@ -22,6 +20,8 @@ int main()
             }
         }
     }
+
+    world1.RemoveBody(0);
 
     for (Identifier i = 10; i < 60; i++) {
         world1.RemoveBody(i);
@@ -43,6 +43,14 @@ int main()
     // Only print after all timing is done
     std::cout << "Save: " << save_us << " us\n";
     std::cout << "Load: " << load_us << " us\n";
+
+    t0 = high_resolution_clock::now();
+    world1.Update();
+    t1 = high_resolution_clock::now();
+
+    save_us = duration_cast<microseconds>(t1 - t0).count();
+
+    std::cout << "Update: " << save_us << " us\n";
 
     return 0;
 }

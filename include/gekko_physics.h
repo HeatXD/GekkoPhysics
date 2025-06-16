@@ -10,6 +10,11 @@ namespace GekkoPhysics {
 
 	static const Identifier INVALID_ID = -1;
 
+	struct AABB {
+		Vec3 min;
+		Vec3 max;
+	};
+
 	struct Sphere {
 		Vec3 position;
 		Unit radius;
@@ -24,17 +29,18 @@ namespace GekkoPhysics {
 	};
 
 	struct ShapeGroup {
+		AABB bounds;
 		Identifier link_shapes = INVALID_ID;
 	};
 
 	struct Body {
-		Vec3 position = {};
-		Vec3 velocity = {};
-		Vec3 acceleration = {};
-
-		bool is_static = false;
+		Vec3 position;
+		Vec3 velocity;
+		Vec3 acceleration;
 
 		Identifier link_shape_groups = INVALID_ID;
+
+		bool is_static = false;
 	};
 
 	struct L1T8 {
@@ -50,7 +56,7 @@ namespace GekkoPhysics {
 		SparseSet<Identifier, L1T8> _links;
 		SparseSet<Identifier, Sphere> _spheres;
 
-		Vec3 _origin = {}, _up = {};
+		Vec3 _origin, _up;
 		Unit _update_rate { 60 };
 
 	public:
@@ -74,10 +80,12 @@ namespace GekkoPhysics {
 
 		void Save(MemStream& stream);
 		void Load(MemStream& stream);
-		void Advance();
+		void Update();
 
 	private:
 		// Create a 1 to 8 link between entites.
 		Identifier CreateLink();
+
+		void CheckCollisions();
 	};
 }
