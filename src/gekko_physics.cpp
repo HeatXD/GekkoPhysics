@@ -155,8 +155,16 @@ namespace GekkoPhysics {
 		auto& shape = _shapes.get(shape_id);
 
 		// remove collision shape based on shapetype
-		if (shape.type == Shape::Sphere) {
+		switch (shape.type) {
+		case Shape::OBB:
+			_obbs.remove(shape.shape_type_id);
+			break;
+		case Shape::Sphere:
 			_spheres.remove(shape.shape_type_id);
+			break;
+		case Shape::Capsule:
+			_capsules.remove(shape.shape_type_id);
+			break;
 		}
 
 		// cleanup shape
@@ -168,7 +176,10 @@ namespace GekkoPhysics {
 		_shape_groups.save(stream);
 		_shapes.save(stream);
 		_links.save(stream);
+		
+		_obbs.save(stream);
 		_spheres.save(stream);
+		_capsules.save(stream);
 
 		stream.write_chunk(&_origin, sizeof(Vec3));
 		stream.write_chunk(&_up, sizeof(Vec3));
@@ -180,7 +191,10 @@ namespace GekkoPhysics {
 		_shape_groups.load(stream);
 		_shapes.load(stream);
 		_links.load(stream);
+
+		_obbs.load(stream);
 		_spheres.load(stream);
+		_capsules.load(stream);
 
 		uint32_t out_size = 0;
 

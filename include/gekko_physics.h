@@ -45,6 +45,7 @@ namespace GekkoPhysics {
 		Vec3 position;
 		Vec3 velocity;
 		Vec3 acceleration;
+
 		Mat3 rotation;
 
 		Identifier link_shape_groups = INVALID_ID;
