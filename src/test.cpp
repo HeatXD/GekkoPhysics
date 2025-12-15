@@ -1,4 +1,5 @@
 #include <chrono>
+
 #include "gekko_math.h"
 #include "gekko_ds.h"
 #include "gekko_physics.h"
@@ -9,7 +10,7 @@ int main()
     using namespace std::chrono;
 
     World world1, world2;
-    MemStream stream2;
+    MemStream stream;
 
     for (size_t i = 0; i < 100; i++) {
         auto body_id = world1.CreateBody();
@@ -28,13 +29,13 @@ int main()
     }
 
     auto t0 = high_resolution_clock::now();
-    world1.Save(stream2);
+    world1.Save(stream);
     auto t1 = high_resolution_clock::now();
 
-    stream2.rewind();
+    stream.rewind();
 
     auto t2 = high_resolution_clock::now();
-    world2.Load(stream2);
+    world2.Load(stream);
     auto t3 = high_resolution_clock::now();
 
     auto save_us = duration_cast<microseconds>(t1 - t0).count();

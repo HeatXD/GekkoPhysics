@@ -10,13 +10,19 @@ namespace GekkoPhysics {
 
 	static const Identifier INVALID_ID = -1;
 
-	struct AABB {
-		Vec3 min;
-		Vec3 max;
+	struct OBB {
+		Vec3 center;
+		Vec3 half_extents;
+		Mat3 rotation;
 	};
 
 	struct Sphere {
-		Vec3 position;
+		Vec3 center;
+		Unit radius;
+	};
+
+	struct Capsule {
+		Vec3 start, end;
 		Unit radius;
 	};
 
@@ -24,12 +30,14 @@ namespace GekkoPhysics {
 		Identifier shape_type_id = INVALID_ID;
 		enum Type : uint8_t {
 			None,
+			OBB,
 			Sphere,
+			Capsule,
 		} type = None;
 	};
 
 	struct ShapeGroup {
-		AABB bounds;
+		OBB bounds;
 		Identifier link_shapes = INVALID_ID;
 	};
 
@@ -37,6 +45,7 @@ namespace GekkoPhysics {
 		Vec3 position;
 		Vec3 velocity;
 		Vec3 acceleration;
+		Mat3 rotation;
 
 		Identifier link_shape_groups = INVALID_ID;
 
@@ -46,15 +55,19 @@ namespace GekkoPhysics {
 	struct L1T8 {
 		Identifier children[8];
 
-		void Reset() const;
+		void Reset();
 	};
 
 	class World {
+		SparseSet<Identifier, L1T8> _links;
+
 		SparseSet<Identifier, Body> _bodies;
 		SparseSet<Identifier, ShapeGroup> _shape_groups;
 		SparseSet<Identifier, Shape> _shapes;
-		SparseSet<Identifier, L1T8> _links;
+
 		SparseSet<Identifier, Sphere> _spheres;
+		SparseSet<Identifier, Capsule> _capsules;
+		SparseSet<Identifier, OBB> _obbs;
 
 		Vec3 _origin, _up;
 		Unit _update_rate { 60 };

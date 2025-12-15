@@ -215,7 +215,7 @@ namespace GekkoPhysics {
 	{
 	}
 
-	void L1T8::Reset() const {
+	void L1T8::Reset() {
 		std::memset((void*) children, INVALID_ID, 8 * sizeof(Identifier));
 	}
 }
