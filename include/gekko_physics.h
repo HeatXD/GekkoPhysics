@@ -38,6 +38,7 @@ namespace GekkoPhysics {
 
 	struct ShapeGroup {
 		OBB bounds;
+		Identifier owner_body = INVALID_ID;
 		Identifier link_shapes = INVALID_ID;
 	};
 
@@ -53,22 +54,22 @@ namespace GekkoPhysics {
 		bool is_static = false;
 	};
 
-	struct L1T8 {
-		Identifier children[8];
-
+	struct Link {
+		static const uint8_t NUM_LINKS = 8;
+		Identifier children[NUM_LINKS];
 		void Reset();
 	};
 
 	class World {
-		SparseSet<Identifier, L1T8> _links;
-
 		SparseSet<Identifier, Body> _bodies;
 		SparseSet<Identifier, ShapeGroup> _shape_groups;
 		SparseSet<Identifier, Shape> _shapes;
 
+		SparseSet<Identifier, Link> _links;
+
+		SparseSet<Identifier, OBB> _obbs;
 		SparseSet<Identifier, Sphere> _spheres;
 		SparseSet<Identifier, Capsule> _capsules;
-		SparseSet<Identifier, OBB> _obbs;
 
 		Vec3 _origin, _up;
 		Unit _update_rate { 60 };

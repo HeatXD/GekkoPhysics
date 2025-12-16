@@ -34,8 +34,9 @@ namespace GekkoPhysics {
 		auto& link = _links.get(body.link_shape_groups);
 		for (size_t i = 0; i < 8; i++) {
 			if (link.children[i] == INVALID_ID) {
-				link.children[i] = _shape_groups.insert({});
-				group_id = link.children[i];
+				group_id = _shape_groups.insert({});
+				_shape_groups.get(group_id).owner_body = body_id;
+				link.children[i] = group_id;
 				break;
 			}
 		}
@@ -175,6 +176,7 @@ namespace GekkoPhysics {
 		_bodies.save(stream);
 		_shape_groups.save(stream);
 		_shapes.save(stream);
+
 		_links.save(stream);
 		
 		_obbs.save(stream);
@@ -190,6 +192,7 @@ namespace GekkoPhysics {
 		_bodies.load(stream);
 		_shape_groups.load(stream);
 		_shapes.load(stream);
+
 		_links.load(stream);
 
 		_obbs.load(stream);
@@ -220,7 +223,7 @@ namespace GekkoPhysics {
 	}
 
 	Identifier World::CreateLink() {
-		auto link = L1T8();
+		auto link = Link();
 		link.Reset();
 		return _links.insert(link);
 	}
@@ -229,7 +232,9 @@ namespace GekkoPhysics {
 	{
 	}
 
-	void L1T8::Reset() {
-		std::memset((void*) children, INVALID_ID, 8 * sizeof(Identifier));
+	void Link::Reset() {
+		for (size_t i = 0; i < NUM_LINKS; i++) {
+			children[i] = INVALID_ID;
+		}
 	}
 }

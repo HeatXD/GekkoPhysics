@@ -10,6 +10,7 @@ int main()
     using namespace std::chrono;
 
     World world1, world2;
+
     MemStream stream;
 
     for (size_t i = 0; i < 100; i++) {
