@@ -228,8 +228,22 @@ namespace GekkoPhysics {
 		return _links.insert(link);
 	}
 
-	void World::CheckCollisions()
-	{
+	void World::CheckCollisions() {
+		const ShapeGroup* groups = _shape_groups.begin();
+		const uint32_t count = _shape_groups.active_size();
+
+		// remove stale pairs.
+		_coll_pairs.clear();
+
+		for (uint32_t i = 0; i < count; i++) {
+			const ShapeGroup& a = groups[i];
+			for (uint32_t j = i + 1; j < count; j++) {
+				const ShapeGroup& b = groups[j];
+				// same-body collisions are not supported.
+				if (a.owner_body == b.owner_body) continue;
+				// todo impl oob check and then app the found
+			}
+		}
 	}
 
 	void Link::Reset() {

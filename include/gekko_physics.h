@@ -60,6 +60,11 @@ namespace GekkoPhysics {
 		void Reset();
 	};
 
+	struct CollisionPair {
+		Identifier group_a;
+		Identifier group_b;
+	};
+
 	class World {
 		SparseSet<Identifier, Body> _bodies;
 		SparseSet<Identifier, ShapeGroup> _shape_groups;
@@ -70,6 +75,8 @@ namespace GekkoPhysics {
 		SparseSet<Identifier, OBB> _obbs;
 		SparseSet<Identifier, Sphere> _spheres;
 		SparseSet<Identifier, Capsule> _capsules;
+
+		Vec<CollisionPair> _coll_pairs;
 
 		Vec3 _origin, _up;
 		Unit _update_rate { 60 };
