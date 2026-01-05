@@ -32,7 +32,7 @@ namespace GekkoPhysics {
 
 		Identifier group_id = INVALID_ID;
 		auto& link = _links.get(body.link_shape_groups);
-		for (size_t i = 0; i < 8; i++) {
+		for (size_t i = 0; i < Link::NUM_LINKS; i++) {
 			if (link.children[i] == INVALID_ID) {
 				group_id = _shape_groups.insert({});
 				_shape_groups.get(group_id).owner_body = body_id;
@@ -61,14 +61,22 @@ namespace GekkoPhysics {
 
 		Identifier shape_id = INVALID_ID;
 		auto& link = _links.get(shape_group.link_shapes);
-		for (size_t i = 0; i < 8; i++) {
+		for (size_t i = 0; i < Link::NUM_LINKS; i++) {
 			if (link.children[i] == INVALID_ID) {
 				auto shape = Shape();
-
 				shape.type = shape_type;
-				if (shape.type == Shape::Sphere) {
+
+				switch (shape.type) {
+				case Shape::Sphere:
 					shape.shape_type_id = _spheres.insert({});
-				} 
+					break;
+				case Shape::Capsule:
+					shape.shape_type_id = _capsules.insert({});
+					break;
+				case Shape::OBB:
+					shape.shape_type_id = _obbs.insert({});
+					break;
+				}
 
 				link.children[i] = _shapes.insert(shape);
 				shape_id = link.children[i];
@@ -87,7 +95,7 @@ namespace GekkoPhysics {
 		// cleanup shapegroups
 		if (body.link_shape_groups != INVALID_ID) {
 			auto& link = _links.get(body.link_shape_groups);
-			for (size_t i = 0; i < 8; i++) {
+			for (size_t i = 0; i < Link::NUM_LINKS; i++) {
 				RemoveShapeGroup(id, link.children[i]);
 			}
 			_links.remove(body.link_shape_groups);
@@ -106,7 +114,7 @@ namespace GekkoPhysics {
 		auto& body = _bodies.get(body_id);
 		auto& shapegroup_link = _links.get(body.link_shape_groups);
 		bool found_group = false;
-		for (size_t i = 0; i < 8; i++){
+		for (size_t i = 0; i < Link::NUM_LINKS; i++){
 			if (shapegroup_link.children[i] == shape_group_id) {
 				// mark link as free/open
 				shapegroup_link.children[i] = INVALID_ID;
@@ -122,7 +130,7 @@ namespace GekkoPhysics {
 		auto& group = _shape_groups.get(shape_group_id);
 		if (group.link_shapes != INVALID_ID) {
 			auto& shapes_link = _links.get(group.link_shapes);
-			for (size_t i = 0; i < 8; i++) {
+			for (size_t i = 0; i < Link::NUM_LINKS; i++) {
 				RemoveShape(shape_group_id, shapes_link.children[i]);
 			}
 			_links.remove(group.link_shapes);
@@ -141,7 +149,7 @@ namespace GekkoPhysics {
 		auto& shape_group = _shape_groups.get(shape_group_id);
 		auto& shapes_link = _links.get(shape_group.link_shapes);
 		bool found_shape = false;
-		for (size_t i = 0; i < 8; i++) {
+		for (size_t i = 0; i < Link::NUM_LINKS; i++) {
 			if (shapes_link.children[i] == shape_id) {
 				// mark link as free/open
 				shapes_link.children[i] = INVALID_ID;
@@ -234,7 +242,7 @@ namespace GekkoPhysics {
 
 		// remove stale pairs.
 		_coll_pairs.clear();
-
+		int ijk = 0;
 		for (uint32_t i = 0; i < count; i++) {
 			const ShapeGroup& a = groups[i];
 			for (uint32_t j = i + 1; j < count; j++) {
@@ -242,8 +250,10 @@ namespace GekkoPhysics {
 				// same-body collisions are not supported.
 				if (a.owner_body == b.owner_body) continue;
 				// todo impl oob check and then app the found
+				ijk++;
 			}
 		}
+		printf("ijk:%d\n", ijk);
 	}
 
 	void Link::Reset() {

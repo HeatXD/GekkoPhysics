@@ -6,6 +6,14 @@
 namespace GekkoMath {
     using Unit = fpm::fixed_16_16;
 
+    inline Unit ABS(Unit num) {
+        return fpm::abs(num);
+    }
+
+    inline Unit SQRT(Unit num) {
+        return fpm::sqrt(num);
+    }
+
     // VISUALIZATION ONLY
     struct Vec3F {
         float x, y, z;

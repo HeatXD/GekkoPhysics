@@ -23,12 +23,6 @@ int main()
         }
     }
 
-    world1.RemoveBody(0);
-
-    for (Identifier i = 10; i < 60; i++) {
-        world1.RemoveBody(i);
-    }
-
     auto t0 = high_resolution_clock::now();
     world1.Save(stream);
     auto t1 = high_resolution_clock::now();
