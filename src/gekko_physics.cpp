@@ -67,14 +67,14 @@ namespace GekkoPhysics {
 				shape.type = shape_type;
 
 				switch (shape.type) {
+				case Shape::OBB:
+					shape.shape_type_id = _obbs.insert({});
+					break;
 				case Shape::Sphere:
 					shape.shape_type_id = _spheres.insert({});
 					break;
 				case Shape::Capsule:
 					shape.shape_type_id = _capsules.insert({});
-					break;
-				case Shape::OBB:
-					shape.shape_type_id = _obbs.insert({});
 					break;
 				}
 
@@ -241,7 +241,6 @@ namespace GekkoPhysics {
 		const uint32_t count = _shape_groups.active_size();
 
 		// remove stale pairs.
-		_coll_pairs.clear();
 		int ijk = 0;
 		for (uint32_t i = 0; i < count; i++) {
 			const ShapeGroup& a = groups[i];
@@ -249,6 +248,8 @@ namespace GekkoPhysics {
 				const ShapeGroup& b = groups[j];
 				// same-body collisions are not supported.
 				if (a.owner_body == b.owner_body) continue;
+				// layers and mask check. skip when it dont match or not defined.
+				if ((a.layer & b.mask) == 0 || (b.layer & a.mask) == 0) continue;
 				// todo impl oob check and then app the found
 				ijk++;
 			}

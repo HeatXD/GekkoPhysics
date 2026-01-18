@@ -36,10 +36,10 @@ namespace GekkoPhysics {
 		} type = None;
 	};
 
-	struct ShapeGroup {
-		OBB bounds;
+	struct ShapeGroup { 
 		Identifier owner_body = INVALID_ID;
 		Identifier link_shapes = INVALID_ID;
+		uint32_t layer = 0, mask = 0;
 	};
 
 	struct Body {
@@ -60,11 +60,6 @@ namespace GekkoPhysics {
 		void Reset();
 	};
 
-	struct CollisionPair {
-		Identifier group_a;
-		Identifier group_b;
-	};
-
 	class World {
 		SparseSet<Identifier, Body> _bodies;
 		SparseSet<Identifier, ShapeGroup> _shape_groups;
@@ -75,8 +70,6 @@ namespace GekkoPhysics {
 		SparseSet<Identifier, OBB> _obbs;
 		SparseSet<Identifier, Sphere> _spheres;
 		SparseSet<Identifier, Capsule> _capsules;
-
-		Vec<CollisionPair> _coll_pairs;
 
 		Vec3 _origin, _up;
 		Unit _update_rate { 60 };
@@ -90,8 +83,8 @@ namespace GekkoPhysics {
 
 		Identifier CreateBody();
 		// Adds a shapegroup to a body.
-		// Currently limited to 8 shapegroups per body.
-		// And 8 shapes per shapegroup.
+		// Currently limited to NUM_LINK shapegroups per body.
+		// And NUM_LINK shapes per shapegroup.
 		Identifier AddShapeGroup(Identifier body_id);
 		// Returns a shape containing the selected shape.
 		Identifier AddShape(Identifier shape_group_id, Shape::Type shape_type);
@@ -102,10 +95,11 @@ namespace GekkoPhysics {
 
 		void Save(MemStream& stream);
 		void Load(MemStream& stream);
+
 		void Update();
 
 	private:
-		// Create a 1 to 8 link between entites.
+		// Create a link between entites.
 		Identifier CreateLink();
 
 		void CheckCollisions();

@@ -6,14 +6,6 @@
 namespace GekkoMath {
     using Unit = fpm::fixed_16_16;
 
-    inline Unit ABS(Unit num) {
-        return fpm::abs(num);
-    }
-
-    inline Unit SQRT(Unit num) {
-        return fpm::sqrt(num);
-    }
-
     // VISUALIZATION ONLY
     struct Vec3F {
         float x, y, z;
@@ -155,4 +147,21 @@ namespace GekkoMath {
             return cols[0] == o.cols[0] && cols[1] == o.cols[1] && cols[2] == o.cols[2];
         }
     };
+
+    // util funcs
+    inline Unit abs(Unit num) {
+        return fpm::abs(num);
+    }
+
+    inline Unit sqrt(Unit num) {
+        return fpm::sqrt(num);
+    }
+
+    inline Unit clamp(Unit num, Unit lo, Unit hi) {
+        return (num < lo) ? lo : (num > hi ? hi : num);
+    }
+
+    inline Unit length(const Vec3& vector) {
+        return fpm::sqrt(vector.Dot(vector));
+    }
 }
