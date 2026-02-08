@@ -143,10 +143,12 @@ namespace GekkoPhysics {
 	void World::RemoveShape(Identifier shape_group_id, Identifier shape_id) {
 		if (shape_id == INVALID_ID ||
 			shape_group_id == INVALID_ID ||
-			!_shapes.contains(shape_id)) return;
+			!_shapes.contains(shape_id) ||
+			!_shape_groups.contains(shape_group_id)) return;
 
 		// cleanup shapes link in shapegroup
 		auto& shape_group = _shape_groups.get(shape_group_id);
+		if (shape_group.link_shapes == INVALID_ID) return;
 		auto& shapes_link = _links.get(shape_group.link_shapes);
 		bool found_shape = false;
 		for (size_t i = 0; i < Link::NUM_LINKS; i++) {
@@ -254,7 +256,6 @@ namespace GekkoPhysics {
 				ijk++;
 			}
 		}
-		printf("ijk:%d\n", ijk);
 	}
 
 	void Link::Reset() {

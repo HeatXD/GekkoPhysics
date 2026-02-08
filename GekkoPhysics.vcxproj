@@ -106,6 +106,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)include</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -121,6 +122,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)include</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -131,7 +133,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\gekko_physics.cpp" />
-    <ClCompile Include="src\test.cpp" />
+    <ClCompile Include="src\algo.cpp" />
+    <ClCompile Include="src\gekko_physics_tests.cpp" />
+    <ClCompile Include="src\algo_tests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\fpm\fixed.hpp" />
@@ -140,6 +144,7 @@
     <ClInclude Include="include\gekko_ds.h" />
     <ClInclude Include="include\gekko_math.h" />
     <ClInclude Include="include\gekko_physics.h" />
+    <ClInclude Include="include\algo.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="include\fpm\LICENSE.txt" />

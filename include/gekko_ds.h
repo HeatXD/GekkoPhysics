@@ -273,12 +273,19 @@ namespace GekkoDS {
                 return;
             }
 
-            Q index = _sparse[id];
-            Q last_index = _dense.size() - 1;
-
+            // If active, move to the disabled region first to keep the partition intact.
             if (is_enabled(id)) {
+                Q index = _sparse[id];
+                Q last_active = _active_count - 1;
+                if (index != last_active) {
+                    swap_dense(index, last_active);
+                }
                 _active_count--;
             }
+
+            // Now the element is in the disabled region. Swap with last and pop.
+            Q index = _sparse[id];
+            Q last_index = _dense.size() - 1;
 
             if (index != last_index) {
                 swap_dense(index, last_index);

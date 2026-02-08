@@ -15,7 +15,7 @@ namespace GekkoMath {
     struct Vec3 {
         Unit x, y, z;
 
-        Vec3() = default;
+        Vec3() : x{0}, y{0}, z{0} {}
         Vec3(const Vec3& v) = default;
         Vec3(const Unit& xx, const Unit& yy, const Unit& zz) : x(xx), y(yy), z(zz) {}
 
@@ -163,5 +163,11 @@ namespace GekkoMath {
 
     inline Unit length(const Vec3& vector) {
         return fpm::sqrt(vector.Dot(vector));
+    }
+
+    inline Vec3 normalize(const Vec3& v) {
+        Unit len = length(v);
+        if (len == Unit{0}) return Vec3();
+        return v / len;
     }
 }
