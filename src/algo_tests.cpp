@@ -294,8 +294,9 @@ TEST_SUITE("Collision: Sphere vs OBB") {
         CHECK(r.hit);
         // inside: min pen axis is x (pen_x=4), y (pen_y=5), z (pen_z=5) => min is x with 4
         // depth = 4 + 1 = 5
+        // normal points from sphere toward nearest OBB face (negative x direction)
         CHECK(r.depth == U(5));
-        CHECK(r.normal.x == U(1));
+        CHECK(r.normal.x == U(-1));
     }
 
     TEST_CASE("sphere outside OBB corner") {
@@ -310,15 +311,10 @@ TEST_SUITE("Collision: Sphere vs OBB") {
     }
 
     TEST_CASE("rotated OBB") {
-        // 90 degree rotation around Y: X->Z, Z->-X
         OBB box;
         box.center = Vec3(U(0), U(0), U(0));
         box.half_extents = Vec3(U(3), U(1), U(1));
-        box.rotation = Mat3(
-            Vec3(U(0), U(0), U(-1)),  // col0 (right)
-            Vec3(U(0), U(1), U(0)),   // col1 (up)
-            Vec3(U(1), U(0), U(0))    // col2 (forward)
-        );
+        box.rotation = Mat3::RotateY(90);
         // The box is 6 units long along world-Z, 2 along world-Y, 2 along world-X
 
         Sphere s; s.center = Vec3(U(0), U(0), U(4)); s.radius = U(1);
@@ -351,10 +347,37 @@ TEST_SUITE("Collision: Sphere vs OBB") {
         Sphere s; s.center = Vec3(UF(1, 2), U(0), U(0)); s.radius = UF(1, 4); // center 0.5, r=0.25
         // inside: pen_x = 2-0.5 = 1.5, pen_y = 2, pen_z = 2 => min is x with 1.5
         // depth = 1.5 + 0.25 = 1.75
+        // normal points from sphere toward nearest OBB face (negative x direction)
         auto r = Algo::CollideSphereOBB(s, box);
         CHECK(r.hit);
         CHECK(r.depth == UF(7, 4));
-        CHECK(r.normal.x == U(1));
+        CHECK(r.normal.x == U(-1));
+    }
+
+    TEST_CASE("sphere overlapping 30-deg-Z rotated OBB") {
+        OBB box;
+        box.center = Vec3(U(0), U(0), U(0));
+        box.half_extents = Vec3(U(3), U(1), U(1));
+        box.rotation = Mat3::RotateZ(30);
+        // Box long axis tilted 30 deg from X toward Y
+
+        Sphere s; s.center = Vec3(U(0), U(2), U(0)); s.radius = U(1);
+        // Closest on OBB ~0.55 away from sphere center (< radius 1)
+        auto r = Algo::CollideSphereOBB(s, box);
+        CHECK(r.hit);
+        CHECK(r.depth > U(0));
+    }
+
+    TEST_CASE("sphere separated from 30-deg-Z rotated OBB") {
+        OBB box;
+        box.center = Vec3(U(0), U(0), U(0));
+        box.half_extents = Vec3(U(3), U(1), U(1));
+        box.rotation = Mat3::RotateZ(30);
+
+        Sphere s; s.center = Vec3(U(0), U(4), U(0)); s.radius = U(1);
+        // OBB max Y extent ~2.37, sphere at y=4 with r=1 => gap > 0.6
+        auto r = Algo::CollideSphereOBB(s, box);
+        CHECK(!r.hit);
     }
 }
 
@@ -412,15 +435,10 @@ TEST_SUITE("Collision: Capsule vs OBB") {
     }
 
     TEST_CASE("rotated OBB with capsule") {
-        // 90 degree rotation around Y
         OBB box;
         box.center = Vec3(U(0), U(0), U(0));
         box.half_extents = Vec3(U(3), U(1), U(1));
-        box.rotation = Mat3(
-            Vec3(U(0), U(0), U(-1)),
-            Vec3(U(0), U(1), U(0)),
-            Vec3(U(1), U(0), U(0))
-        );
+        box.rotation = Mat3::RotateY(90);
 
         Capsule c; c.start = Vec3(U(0), U(0), U(5)); c.end = Vec3(U(0), U(0), U(10)); c.radius = U(1);
         // Box extends 3 along world-Z. Capsule starts at z=5. Closest on seg = (0,0,5).
@@ -441,6 +459,32 @@ TEST_SUITE("Collision: Capsule vs OBB") {
         auto r = Algo::CollideCapsuleOBB(c, box);
         CHECK(r.hit);
         CHECK(r.depth == U(0));
+    }
+
+    TEST_CASE("capsule overlapping 30-deg-Z rotated OBB") {
+        OBB box;
+        box.center = Vec3(U(0), U(0), U(0));
+        box.half_extents = Vec3(U(2), U(1), U(1));
+        box.rotation = Mat3::RotateZ(30);
+
+        Capsule c; c.start = Vec3(U(-3), U(2), U(0)); c.end = Vec3(U(3), U(2), U(0)); c.radius = U(1);
+        // Capsule runs horizontally at y=2. OBB tilted 30 deg extends ~1.87 along Y.
+        // Closest OBB surface ~0.55 from capsule axis, well within radius 1.
+        auto r = Algo::CollideCapsuleOBB(c, box);
+        CHECK(r.hit);
+        CHECK(r.depth > U(0));
+    }
+
+    TEST_CASE("capsule separated from 60-deg-Y rotated OBB") {
+        OBB box;
+        box.center = Vec3(U(0), U(0), U(0));
+        box.half_extents = Vec3(U(2), U(1), U(1));
+        box.rotation = Mat3::RotateY(60);
+
+        Capsule c; c.start = Vec3(U(-3), U(0), U(4)); c.end = Vec3(U(3), U(0), U(4)); c.radius = U(1);
+        // OBB max Z extent ~2.23, capsule at z=4 with r=1 => gap ~0.77
+        auto r = Algo::CollideCapsuleOBB(c, box);
+        CHECK(!r.hit);
     }
 }
 
@@ -580,6 +624,101 @@ TEST_SUITE("Collision: OBB vs OBB") {
         CHECK(r.normal.x == U(1));
     }
 
+    TEST_CASE("one OBB rotated 90 deg around Z - overlapping") {
+        OBB a;
+        a.center = Vec3(U(0), U(0), U(0));
+        a.half_extents = Vec3(U(4), U(1), U(1));
+        a.rotation = Mat3();
+
+        OBB b;
+        b.center = Vec3(U(0), U(3), U(0));
+        b.half_extents = Vec3(U(4), U(1), U(1));
+        b.rotation = Mat3::RotateZ(90);
+        // b extends 4 along world-Y from center y=3
+        // proj_a on Y = 1, proj_b on Y = 4, dist = 3, overlap = 1+4-3 = 2
+        auto r = Algo::CollideOBBs(a, b);
+        CHECK(r.hit);
+    }
+
+    TEST_CASE("one OBB rotated 90 deg around Z - separated") {
+        OBB a;
+        a.center = Vec3(U(0), U(0), U(0));
+        a.half_extents = Vec3(U(1), U(1), U(1));
+        a.rotation = Mat3();
+
+        OBB b;
+        b.center = Vec3(U(0), U(6), U(0));
+        b.half_extents = Vec3(U(4), U(1), U(1));
+        b.rotation = Mat3::RotateZ(90);
+        // b extends 4 along world-Y from y=6: y=2 to y=10
+        // a extends 1 along world-Y: y=-1 to y=1
+        auto r = Algo::CollideOBBs(a, b);
+        CHECK(!r.hit);
+    }
+
+    TEST_CASE("both OBBs rotated 45 deg - overlapping") {
+        OBB a;
+        a.center = Vec3(U(0), U(0), U(0));
+        a.half_extents = Vec3(U(2), U(1), U(1));
+        a.rotation = Mat3::RotateZ(45);
+
+        OBB b;
+        b.center = Vec3(U(3), U(0), U(0));
+        b.half_extents = Vec3(U(2), U(1), U(1));
+        b.rotation = Mat3::RotateZ(-45);
+
+        auto r = Algo::CollideOBBs(a, b);
+        CHECK(r.hit);
+        CHECK(r.depth > U(0));
+    }
+
+    TEST_CASE("both OBBs rotated 45 deg - separated") {
+        OBB a;
+        a.center = Vec3(U(0), U(0), U(0));
+        a.half_extents = Vec3(U(1), U(1), U(1));
+        a.rotation = Mat3::RotateZ(45);
+
+        OBB b;
+        b.center = Vec3(U(5), U(0), U(0));
+        b.half_extents = Vec3(U(1), U(1), U(1));
+        b.rotation = Mat3::RotateZ(-45);
+
+        auto r = Algo::CollideOBBs(a, b);
+        CHECK(!r.hit);
+    }
+
+    TEST_CASE("edge-edge cross product axis") {
+        OBB a;
+        a.center = Vec3(U(0), U(0), U(0));
+        a.half_extents = Vec3(U(5), U(1), U(1));
+        a.rotation = Mat3();
+
+        OBB b;
+        b.center = Vec3(U(0), U(0), U(3));
+        b.half_extents = Vec3(U(1), U(5), U(1));
+        b.rotation = Mat3::RotateX(90);
+        // b is long along world-Z (half=5), centered at z=3
+        auto r = Algo::CollideOBBs(a, b);
+        CHECK(r.hit);
+    }
+
+    TEST_CASE("one OBB rotated 90 deg around Y - just touching") {
+        OBB a;
+        a.center = Vec3(U(0), U(0), U(0));
+        a.half_extents = Vec3(U(3), U(1), U(1));
+        a.rotation = Mat3();
+
+        OBB b;
+        b.center = Vec3(U(4), U(0), U(0));
+        b.half_extents = Vec3(U(3), U(1), U(1));
+        b.rotation = Mat3::RotateY(90);
+        // b long axis now along world-Z. Along X: b projects 1
+        // dist on X = 4, a projects 3, overlap = 3+1-4 = 0
+        auto r = Algo::CollideOBBs(a, b);
+        CHECK(r.hit);
+        CHECK(r.depth == U(0));
+    }
+
     TEST_CASE("fractional center offset") {
         OBB a;
         a.center = Vec3(UF(1, 4), U(0), U(0)); // 0.25
@@ -595,5 +734,107 @@ TEST_SUITE("Collision: OBB vs OBB") {
         auto r = Algo::CollideOBBs(a, b);
         CHECK(r.hit);
         CHECK(r.depth == U(0));
+    }
+
+    TEST_CASE("one OBB rotated 30 deg around Z - overlapping") {
+        OBB a;
+        a.center = Vec3(U(0), U(0), U(0));
+        a.half_extents = Vec3(U(2), U(1), U(1));
+        a.rotation = Mat3();
+
+        OBB b;
+        b.center = Vec3(U(3), U(0), U(0));
+        b.half_extents = Vec3(U(2), U(1), U(1));
+        b.rotation = Mat3::RotateZ(30);
+
+        // b's X-axis is (cos30,sin30,0). Projections on a's X give overlap ~1.2
+        auto r = Algo::CollideOBBs(a, b);
+        CHECK(r.hit);
+        CHECK(r.depth > U(0));
+    }
+
+    TEST_CASE("one OBB rotated 30 deg around Z - separated") {
+        OBB a;
+        a.center = Vec3(U(0), U(0), U(0));
+        a.half_extents = Vec3(U(1), U(1), U(1));
+        a.rotation = Mat3();
+
+        OBB b;
+        b.center = Vec3(U(4), U(0), U(0));
+        b.half_extents = Vec3(U(1), U(1), U(1));
+        b.rotation = Mat3::RotateZ(30);
+
+        // Along a's X: proj_a=1, proj_b=cos30+sin30~1.37, dist=4 => gap ~1.63
+        auto r = Algo::CollideOBBs(a, b);
+        CHECK(!r.hit);
+    }
+
+    TEST_CASE("one OBB rotated 60 deg around Y - overlapping") {
+        OBB a;
+        a.center = Vec3(U(0), U(0), U(0));
+        a.half_extents = Vec3(U(3), U(1), U(1));
+        a.rotation = Mat3();
+
+        OBB b;
+        b.center = Vec3(U(4), U(0), U(0));
+        b.half_extents = Vec3(U(3), U(1), U(1));
+        b.rotation = Mat3::RotateY(60);
+
+        // b's long axis rotated 60 deg into XZ plane.
+        // All 15 SAT axes show overlap (min ~0.63 on cross-product axis a[1]xb[0])
+        auto r = Algo::CollideOBBs(a, b);
+        CHECK(r.hit);
+        CHECK(r.depth > U(0));
+    }
+
+    TEST_CASE("compound rotation (30X then 60Y) - overlapping") {
+        OBB a;
+        a.center = Vec3(U(0), U(0), U(0));
+        a.half_extents = Vec3(U(2), U(2), U(2));
+        a.rotation = Mat3();
+
+        OBB b;
+        b.center = Vec3(U(3), U(1), U(0));
+        b.half_extents = Vec3(U(2), U(1), U(1));
+        b.rotation = Mat3::RotateY(60) * Mat3::RotateX(30);
+
+        // Arbitrary orientation. a is a large cube, b is close enough to overlap.
+        auto r = Algo::CollideOBBs(a, b);
+        CHECK(r.hit);
+        CHECK(r.depth > U(0));
+    }
+
+    TEST_CASE("both OBBs with non-45 rotations - separated") {
+        OBB a;
+        a.center = Vec3(U(0), U(0), U(0));
+        a.half_extents = Vec3(U(1), U(1), U(1));
+        a.rotation = Mat3::RotateZ(15);
+
+        OBB b;
+        b.center = Vec3(U(5), U(0), U(0));
+        b.half_extents = Vec3(U(1), U(1), U(1));
+        b.rotation = Mat3::RotateZ(60);
+
+        // Max projection of unit cube ~1.41. Sum ~2.83. Distance = 5 => clear gap.
+        auto r = Algo::CollideOBBs(a, b);
+        CHECK(!r.hit);
+    }
+
+    TEST_CASE("parallel long OBBs, one rotated 30X - separated by oblique axis") {
+        OBB a;
+        a.center = Vec3(U(0), U(0), U(0));
+        a.half_extents = Vec3(U(4), U(1), U(1));
+        a.rotation = Mat3();
+
+        OBB b;
+        b.center = Vec3(U(0), U(2), U(2));
+        b.half_extents = Vec3(U(4), U(1), U(1));
+        b.rotation = Mat3::RotateX(30);
+
+        // Both long along X. Along b's Y-axis (0,cos30,sin30):
+        // proj_a = cos30+sin30 ~1.37, proj_b = 1, dist = |2*cos30+2*sin30| ~2.73
+        // overlap = 1.37+1-2.73 = -0.37 => separated on this oblique axis
+        auto r = Algo::CollideOBBs(a, b);
+        CHECK(!r.hit);
     }
 }

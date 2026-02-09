@@ -143,7 +143,7 @@ namespace GekkoPhysics {
 			if (pen_z < min_pen) { min_pen = pen_z; min_axis = 2; }
 
 			Unit sign = local.Dot(b.rotation.cols[min_axis]) < Unit{0} ? Unit{-1} : Unit{1};
-			result.normal = b.rotation.cols[min_axis] * sign;
+			result.normal = b.rotation.cols[min_axis] * (Unit{0} - sign);
 			result.depth = min_pen + a.radius;
 			return result;
 		}

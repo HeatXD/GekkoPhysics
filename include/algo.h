@@ -14,8 +14,7 @@ namespace GekkoPhysics {
 	class Algo {
 	public:
 		static Vec3 ClosestPointOnSegment(const Vec3& point, const Vec3& seg_start, const Vec3& seg_end);
-		static void ClosestPointsBetweenSegments(const Vec3& s1_start, const Vec3& s1_end,
-			const Vec3& s2_start, const Vec3& s2_end, Vec3& out1, Vec3& out2);
+		static void ClosestPointsBetweenSegments(const Vec3& s1_start, const Vec3& s1_end, const Vec3& s2_start, const Vec3& s2_end, Vec3& out1, Vec3& out2);
 		static Vec3 ClosestPointOnOBB(const Vec3& point, const OBB& obb);
 
 		static CollisionResult CollideSpheres(const Sphere& a, const Sphere& b);

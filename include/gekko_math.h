@@ -120,6 +120,28 @@ namespace GekkoMath {
         }
     };
 
+    inline Unit cosdeg(int deg) {
+        int a = ((deg % 360) + 360) % 360;
+        switch (a) {
+            case 0:   return Unit{1};
+            case 90:  return Unit{0};
+            case 180: return Unit{-1};
+            case 270: return Unit{0};
+            default:  return fpm::cos(Unit::pi() * Unit{deg} / Unit{180});
+        }
+    }
+
+    inline Unit sindeg(int deg) {
+        int a = ((deg % 360) + 360) % 360;
+        switch (a) {
+            case 0:   return Unit{0};
+            case 90:  return Unit{1};
+            case 180: return Unit{0};
+            case 270: return Unit{-1};
+            default:  return fpm::sin(Unit::pi() * Unit{deg} / Unit{180});
+        }
+    }
+
     struct Mat3 {
         Vec3 cols[3]; // column-major: [right, up, forward]
 
@@ -143,8 +165,43 @@ namespace GekkoMath {
             return origin + rotation.Transform(local);
         }
 
+        Mat3 operator*(const Mat3& o) const {
+            return Mat3(
+                *this * o.cols[0],
+                *this * o.cols[1],
+                *this * o.cols[2]
+            );
+        }
+
         bool operator==(const Mat3& o) const {
             return cols[0] == o.cols[0] && cols[1] == o.cols[1] && cols[2] == o.cols[2];
+        }
+
+        static Mat3 RotateX(int deg) {
+            Unit c = cosdeg(deg), s = sindeg(deg);
+            return Mat3(
+                Vec3(Unit{1}, Unit{0}, Unit{0}),
+                Vec3(Unit{0}, c, s),
+                Vec3(Unit{0}, Unit{0} - s, c)
+            );
+        }
+
+        static Mat3 RotateY(int deg) {
+            Unit c = cosdeg(deg), s = sindeg(deg);
+            return Mat3(
+                Vec3(c, Unit{0}, Unit{0} - s),
+                Vec3(Unit{0}, Unit{1}, Unit{0}),
+                Vec3(s, Unit{0}, c)
+            );
+        }
+
+        static Mat3 RotateZ(int deg) {
+            Unit c = cosdeg(deg), s = sindeg(deg);
+            return Mat3(
+                Vec3(c, s, Unit{0}),
+                Vec3(Unit{0} - s, c, Unit{0}),
+                Vec3(Unit{0}, Unit{0}, Unit{1})
+            );
         }
     };
 
@@ -170,4 +227,5 @@ namespace GekkoMath {
         if (len == Unit{0}) return Vec3();
         return v / len;
     }
+
 }
