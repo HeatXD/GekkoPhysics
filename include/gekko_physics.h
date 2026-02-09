@@ -124,6 +124,9 @@ namespace GekkoPhysics {
 		Capsule WorldCapsule(const Capsule& local, const Body& body) const;
 
 		void CheckCollisions();
+		void BuildGroupAABBs();
+		bool BroadphaseFilter(const ShapeGroup& group_a, const ShapeGroup& group_b, const AABB& aabb_a, const AABB& aabb_b) const;
+		void NarrowphaseGroupPair(const ShapeGroup& group_a, const ShapeGroup& group_b);
 		CollisionResult CollideShapes(const Shape& a, const Body& body_a, const Shape& b, const Body& body_b) const;
 		AABB ComputeShapeGroupAABB(const ShapeGroup& group, const Body& body) const;
 	};

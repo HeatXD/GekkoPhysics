@@ -20,7 +20,7 @@ namespace GekkoPhysics {
 
 	Identifier World::AddShapeGroup(Identifier body_id) {
 		if (!_bodies.contains(body_id)) return INVALID_ID;
-		
+
 		// no shapegroups? create a link.
 		auto& body = _bodies.get(body_id);
 		if (body.link_shape_groups == INVALID_ID) {
@@ -136,7 +136,7 @@ namespace GekkoPhysics {
 			}
 			_links.remove(group.link_shapes);
 		}
-		
+
 		// remove shapegroup
 		_shape_groups.remove(shape_group_id);
 	}
@@ -189,7 +189,7 @@ namespace GekkoPhysics {
 		_shapes.save(stream);
 
 		_links.save(stream);
-		
+
 		_obbs.save(stream);
 		_spheres.save(stream);
 		_capsules.save(stream);
@@ -210,16 +210,16 @@ namespace GekkoPhysics {
 		_spheres.load(stream);
 		_capsules.load(stream);
 
-		uint32_t out_size = 0;
+		uint32_t chunk_size = 0;
 
-		auto data = stream.read_chunk(out_size);
-		std::memcpy(&_origin, data, out_size);
+		auto chunk_data = stream.read_chunk(chunk_size);
+		std::memcpy(&_origin, chunk_data, chunk_size);
 
-		data = stream.read_chunk(out_size);
-		std::memcpy(&_up, data, out_size);
+		chunk_data = stream.read_chunk(chunk_size);
+		std::memcpy(&_up, chunk_data, chunk_size);
 
-		data = stream.read_chunk(out_size);
-		std::memcpy(&_update_rate, data, out_size);
+		chunk_data = stream.read_chunk(chunk_size);
+		std::memcpy(&_update_rate, chunk_data, chunk_size);
 	}
 
 	void World::Update() {
@@ -274,7 +274,7 @@ namespace GekkoPhysics {
 	void World::DrawDebug() const {
 		if (!_debug_draw) return;
 
-		const uint32_t f = _debug_draw->flags;
+		const uint32_t flags = _debug_draw->flags;
 
 		// Colors
 		const Color green(0.0f, 1.0f, 0.0f);
@@ -287,12 +287,12 @@ namespace GekkoPhysics {
 
 		// Iterate bodies
 		const uint32_t body_count = _bodies.active_size();
-		for (uint32_t bi = 0; bi < body_count; bi++) {
-			Identifier body_id = _bodies.entity_id(bi);
+		for (uint32_t body_idx = 0; body_idx < body_count; body_idx++) {
+			Identifier body_id = _bodies.entity_id(body_idx);
 			const Body& body = _bodies.get(body_id);
 
 			// Body axes
-			if (f & DrawFlag_BodyAxes) {
+			if (flags & DrawFlag_BodyAxes) {
 				Vec3F pos = body.position.AsFloat();
 				Mat3F rot = body.rotation.AsFloat();
 				_debug_draw->DrawLine(pos, Vec3F(pos.x + rot.cols[0].x, pos.y + rot.cols[0].y, pos.z + rot.cols[0].z), axis_r);
@@ -304,39 +304,39 @@ namespace GekkoPhysics {
 			if (body.link_shape_groups == INVALID_ID) continue;
 			const auto& group_link = _links.get(body.link_shape_groups);
 
-			for (size_t gi = 0; gi < Link::NUM_LINKS; gi++) {
-				Identifier group_id = group_link.children[gi];
+			for (size_t group_idx = 0; group_idx < Link::NUM_LINKS; group_idx++) {
+				Identifier group_id = group_link.children[group_idx];
 				if (group_id == INVALID_ID || !_shape_groups.contains(group_id)) continue;
 				const ShapeGroup& group = _shape_groups.get(group_id);
 
 				// AABB
-				if (f & DrawFlag_AABBs) {
+				if (flags & DrawFlag_AABBs) {
 					AABB aabb = ComputeShapeGroupAABB(group, body);
 					_debug_draw->DrawAABB(aabb.min.AsFloat(), aabb.max.AsFloat(), yellow);
 				}
 
 				// Shapes
-				if (f & DrawFlag_Shapes) {
+				if (flags & DrawFlag_Shapes) {
 					if (group.link_shapes == INVALID_ID) continue;
 					const auto& shape_link = _links.get(group.link_shapes);
 
-					for (size_t si = 0; si < Link::NUM_LINKS; si++) {
-						Identifier shape_id = shape_link.children[si];
+					for (size_t shape_idx = 0; shape_idx < Link::NUM_LINKS; shape_idx++) {
+						Identifier shape_id = shape_link.children[shape_idx];
 						if (shape_id == INVALID_ID || !_shapes.contains(shape_id)) continue;
 						const Shape& shape = _shapes.get(shape_id);
 
 						switch (shape.type) {
 						case Shape::Sphere: {
-							Sphere ws = WorldSphere(_spheres.get(shape.shape_type_id), body);
-							_debug_draw->DrawSphere(ws.center.AsFloat(), static_cast<float>(ws.radius), green);
+							Sphere world_sphere = WorldSphere(_spheres.get(shape.shape_type_id), body);
+							_debug_draw->DrawSphere(world_sphere.center.AsFloat(), static_cast<float>(world_sphere.radius), green);
 						} break;
 						case Shape::OBB: {
-							OBB wo = WorldOBB(_obbs.get(shape.shape_type_id), body);
-							_debug_draw->DrawBox(wo.center.AsFloat(), wo.half_extents.AsFloat(), wo.rotation.AsFloat(), green);
+							OBB world_obb = WorldOBB(_obbs.get(shape.shape_type_id), body);
+							_debug_draw->DrawBox(world_obb.center.AsFloat(), world_obb.half_extents.AsFloat(), world_obb.rotation.AsFloat(), green);
 						} break;
 						case Shape::Capsule: {
-							Capsule wc = WorldCapsule(_capsules.get(shape.shape_type_id), body);
-							_debug_draw->DrawCapsule(wc.start.AsFloat(), wc.end.AsFloat(), static_cast<float>(wc.radius), green);
+							Capsule world_capsule = WorldCapsule(_capsules.get(shape.shape_type_id), body);
+							_debug_draw->DrawCapsule(world_capsule.start.AsFloat(), world_capsule.end.AsFloat(), static_cast<float>(world_capsule.radius), green);
 						} break;
 						default: break;
 						}
@@ -346,100 +346,100 @@ namespace GekkoPhysics {
 		}
 
 		// Contacts
-		if (f & DrawFlag_Contacts) {
-			for (uint32_t ci = 0; ci < _contacts.size(); ci++) {
-				const ContactPair& cp = _contacts[ci];
-				const Body& ba = _bodies.get(cp.body_a);
-				const Body& bb = _bodies.get(cp.body_b);
-				Vec3F pa = ba.position.AsFloat();
-				Vec3F pb = bb.position.AsFloat();
+		if (flags & DrawFlag_Contacts) {
+			for (uint32_t contact_idx = 0; contact_idx < _contacts.size(); contact_idx++) {
+				const ContactPair& contact = _contacts[contact_idx];
+				const Body& body_a = _bodies.get(contact.body_a);
+				const Body& body_b = _bodies.get(contact.body_b);
+				Vec3F pos_a = body_a.position.AsFloat();
+				Vec3F pos_b = body_b.position.AsFloat();
 				Vec3F mid(
-					(pa.x + pb.x) * 0.5f,
-					(pa.y + pb.y) * 0.5f,
-					(pa.z + pb.z) * 0.5f
+					(pos_a.x + pos_b.x) * 0.5f,
+					(pos_a.y + pos_b.y) * 0.5f,
+					(pos_a.z + pos_b.z) * 0.5f
 				);
 				_debug_draw->DrawPoint(mid, 5.0f, red);
 
-				Vec3F n = cp.normal.AsFloat();
-				_debug_draw->DrawLine(mid, Vec3F(mid.x + n.x, mid.y + n.y, mid.z + n.z), orange);
+				Vec3F normal = contact.normal.AsFloat();
+				_debug_draw->DrawLine(mid, Vec3F(mid.x + normal.x, mid.y + normal.y, mid.z + normal.z), orange);
 			}
 		}
 	}
 
 	Sphere World::WorldSphere(const Sphere& local, const Body& body) const {
-		Sphere w;
-		w.center = body.position + body.rotation * local.center;
-		w.radius = local.radius;
-		return w;
+		Sphere world;
+		world.center = body.position + body.rotation * local.center;
+		world.radius = local.radius;
+		return world;
 	}
 
 	OBB World::WorldOBB(const OBB& local, const Body& body) const {
-		OBB w;
-		w.center = body.position + body.rotation * local.center;
-		w.rotation = body.rotation * local.rotation;
-		w.half_extents = local.half_extents;
-		return w;
+		OBB world;
+		world.center = body.position + body.rotation * local.center;
+		world.rotation = body.rotation * local.rotation;
+		world.half_extents = local.half_extents;
+		return world;
 	}
 
 	Capsule World::WorldCapsule(const Capsule& local, const Body& body) const {
-		Capsule w;
-		w.start = body.position + body.rotation * local.start;
-		w.end = body.position + body.rotation * local.end;
-		w.radius = local.radius;
-		return w;
+		Capsule world;
+		world.start = body.position + body.rotation * local.start;
+		world.end = body.position + body.rotation * local.end;
+		world.radius = local.radius;
+		return world;
 	}
 
 	static constexpr uint8_t ShapePair(uint8_t a, uint8_t b) {
 		return (a << 2) | b;
 	}
 
-	CollisionResult World::CollideShapes(const Shape& a, const Body& ba, const Shape& b, const Body& bb) const {
+	CollisionResult World::CollideShapes(const Shape& a, const Body& body_a, const Shape& b, const Body& body_b) const {
 		// normalize order so first.type <= second.type (OBB=1 < Sphere=2 < Capsule=3)
 		bool swapped = a.type > b.type;
 		const Shape& first  = swapped ? b : a;
 		const Shape& second = swapped ? a : b;
-		const Body& first_body  = swapped ? bb : ba;
-		const Body& second_body = swapped ? ba : bb;
+		const Body& first_body  = swapped ? body_b : body_a;
+		const Body& second_body = swapped ? body_a : body_b;
 
-		CollisionResult r;
+		CollisionResult result;
 		switch (ShapePair(first.type, second.type)) {
 		case ShapePair(Shape::OBB, Shape::OBB): {
-			r = Algo::CollideOBBs(
+			result = Algo::CollideOBBs(
 				WorldOBB(_obbs.get(first.shape_type_id), first_body),
 				WorldOBB(_obbs.get(second.shape_type_id), second_body));
 		} break;
 		case ShapePair(Shape::OBB, Shape::Sphere): {
-			r = Algo::CollideSphereOBB(
+			result = Algo::CollideSphereOBB(
 				WorldSphere(_spheres.get(second.shape_type_id), second_body),
 				WorldOBB(_obbs.get(first.shape_type_id), first_body));
 			swapped = !swapped;
 		} break;
 		case ShapePair(Shape::OBB, Shape::Capsule): {
-			r = Algo::CollideCapsuleOBB(
+			result = Algo::CollideCapsuleOBB(
 				WorldCapsule(_capsules.get(second.shape_type_id), second_body),
 				WorldOBB(_obbs.get(first.shape_type_id), first_body));
 			swapped = !swapped;
 		} break;
 		case ShapePair(Shape::Sphere, Shape::Sphere): {
-			r = Algo::CollideSpheres(
+			result = Algo::CollideSpheres(
 				WorldSphere(_spheres.get(first.shape_type_id), first_body),
 				WorldSphere(_spheres.get(second.shape_type_id), second_body));
 		} break;
 		case ShapePair(Shape::Sphere, Shape::Capsule): {
-			r = Algo::CollideSphereCapsule(
+			result = Algo::CollideSphereCapsule(
 				WorldSphere(_spheres.get(first.shape_type_id), first_body),
 				WorldCapsule(_capsules.get(second.shape_type_id), second_body));
 		} break;
 		case ShapePair(Shape::Capsule, Shape::Capsule): {
-			r = Algo::CollideCapsules(
+			result = Algo::CollideCapsules(
 				WorldCapsule(_capsules.get(first.shape_type_id), first_body),
 				WorldCapsule(_capsules.get(second.shape_type_id), second_body));
 		} break;
-		default: return r;
+		default: return result;
 		}
 
-		if (swapped) r.normal = Vec3(Unit{0}, Unit{0}, Unit{0}) - r.normal;
-		return r;
+		if (swapped) result.normal = Vec3(Unit{0}, Unit{0}, Unit{0}) - result.normal;
+		return result;
 	}
 
 	AABB World::ComputeShapeGroupAABB(const ShapeGroup& group, const Body& body) const {
@@ -486,58 +486,70 @@ namespace GekkoPhysics {
 		_contacts.clear();
 		_group_aabbs.clear();
 
-		const uint32_t count = _shape_groups.active_size();
-
-		for (uint32_t i = 0; i < count; i++) {
-			Identifier gid = _shape_groups.entity_id(i);
-			const ShapeGroup& g = _shape_groups.get(gid);
-			GroupAABB ga;
-			ga.group_id = gid;
-			ga.aabb = ComputeShapeGroupAABB(g, _bodies.get(g.owner_body));
-			_group_aabbs.push_back(ga);
-		}
+		BuildGroupAABBs();
 
 		for (uint32_t i = 0; i < _group_aabbs.size(); i++) {
-			const ShapeGroup& a = _shape_groups.get(_group_aabbs[i].group_id);
+			const ShapeGroup& group_a = _shape_groups.get(_group_aabbs[i].group_id);
 			for (uint32_t j = i + 1; j < _group_aabbs.size(); j++) {
-				const ShapeGroup& b = _shape_groups.get(_group_aabbs[j].group_id);
+				const ShapeGroup& group_b = _shape_groups.get(_group_aabbs[j].group_id);
 
-				// same-body collisions are not supported.
-				if (a.owner_body == b.owner_body) continue;
-				// layers and mask check. skip when it dont match or not defined.
-				if ((a.layer & b.mask) == 0 || (b.layer & a.mask) == 0) continue;
-				// skip static-vs-static
-				if (_bodies.get(a.owner_body).is_static && _bodies.get(b.owner_body).is_static) continue;
-				// broadphase AABB overlap check
-				if (!Algo::OverlapAABB(_group_aabbs[i].aabb, _group_aabbs[j].aabb)) continue;
+				if (!BroadphaseFilter(group_a, group_b, _group_aabbs[i].aabb, _group_aabbs[j].aabb)) continue;
 
-				// narrowphase: iterate shape pairs
-				if (a.link_shapes == INVALID_ID || b.link_shapes == INVALID_ID) continue;
-				const auto& link_a = _links.get(a.link_shapes);
-				const auto& link_b = _links.get(b.link_shapes);
+				NarrowphaseGroupPair(group_a, group_b);
+			}
+		}
+	}
 
-				for (size_t si = 0; si < Link::NUM_LINKS; si++) {
-					Identifier sa_id = link_a.children[si];
-					if (sa_id == INVALID_ID || !_shapes.contains(sa_id)) continue;
-					const auto& sa = _shapes.get(sa_id);
+	void World::BuildGroupAABBs() {
+		const uint32_t group_count = _shape_groups.active_size();
+		for (uint32_t i = 0; i < group_count; i++) {
+			Identifier group_id = _shape_groups.entity_id(i);
+			const ShapeGroup& group = _shape_groups.get(group_id);
+			const Body& body = _bodies.get(group.owner_body);
 
-					for (size_t sj = 0; sj < Link::NUM_LINKS; sj++) {
-						Identifier sb_id = link_b.children[sj];
-						if (sb_id == INVALID_ID || !_shapes.contains(sb_id)) continue;
-						const auto& sb = _shapes.get(sb_id);
+			GroupAABB group_aabb;
+			group_aabb.group_id = group_id;
+			group_aabb.aabb = ComputeShapeGroupAABB(group, body);
+			_group_aabbs.push_back(group_aabb);
+		}
+	}
 
-						auto result = CollideShapes(sa, _bodies.get(a.owner_body), sb, _bodies.get(b.owner_body));
-						if (result.hit) {
-							ContactPair cp;
-							cp.body_a = a.owner_body;
-							cp.body_b = b.owner_body;
-							cp.shape_a = sa_id;
-							cp.shape_b = sb_id;
-							cp.normal = result.normal;
-							cp.depth = result.depth;
-							_contacts.push_back(cp);
-						}
-					}
+	bool World::BroadphaseFilter(const ShapeGroup& group_a, const ShapeGroup& group_b, const AABB& aabb_a, const AABB& aabb_b) const {
+		if (group_a.owner_body == group_b.owner_body) return false;
+		if ((group_a.layer & group_b.mask) == 0 || (group_b.layer & group_a.mask) == 0) return false;
+		if (_bodies.get(group_a.owner_body).is_static && _bodies.get(group_b.owner_body).is_static) return false;
+		if (!Algo::OverlapAABB(aabb_a, aabb_b)) return false;
+		return true;
+	}
+
+	void World::NarrowphaseGroupPair(const ShapeGroup& group_a, const ShapeGroup& group_b) {
+		if (group_a.link_shapes == INVALID_ID || group_b.link_shapes == INVALID_ID) return;
+
+		const auto& link_a = _links.get(group_a.link_shapes);
+		const auto& link_b = _links.get(group_b.link_shapes);
+		const Body& body_a = _bodies.get(group_a.owner_body);
+		const Body& body_b = _bodies.get(group_b.owner_body);
+
+		for (size_t shape_idx_a = 0; shape_idx_a < Link::NUM_LINKS; shape_idx_a++) {
+			Identifier shape_a_id = link_a.children[shape_idx_a];
+			if (shape_a_id == INVALID_ID || !_shapes.contains(shape_a_id)) continue;
+			const auto& shape_a = _shapes.get(shape_a_id);
+
+			for (size_t shape_idx_b = 0; shape_idx_b < Link::NUM_LINKS; shape_idx_b++) {
+				Identifier shape_b_id = link_b.children[shape_idx_b];
+				if (shape_b_id == INVALID_ID || !_shapes.contains(shape_b_id)) continue;
+				const auto& shape_b = _shapes.get(shape_b_id);
+
+				auto result = CollideShapes(shape_a, body_a, shape_b, body_b);
+				if (result.hit) {
+					ContactPair contact;
+					contact.body_a = group_a.owner_body;
+					contact.body_b = group_b.owner_body;
+					contact.shape_a = shape_a_id;
+					contact.shape_b = shape_b_id;
+					contact.normal = result.normal;
+					contact.depth = result.depth;
+					_contacts.push_back(contact);
 				}
 			}
 		}
