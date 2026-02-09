@@ -838,3 +838,247 @@ TEST_SUITE("Collision: OBB vs OBB") {
         CHECK(!r.hit);
     }
 }
+
+// ============================================================================
+// AABB
+// ============================================================================
+
+TEST_SUITE("AABB") {
+    TEST_CASE("ComputeAABB sphere at origin") {
+        Sphere s; s.center = Vec3(U(0), U(0), U(0)); s.radius = U(3);
+        auto aabb = Algo::ComputeAABB(s);
+        CHECK(aabb.min.x == U(-3));
+        CHECK(aabb.min.y == U(-3));
+        CHECK(aabb.min.z == U(-3));
+        CHECK(aabb.max.x == U(3));
+        CHECK(aabb.max.y == U(3));
+        CHECK(aabb.max.z == U(3));
+    }
+
+    TEST_CASE("ComputeAABB sphere offset") {
+        Sphere s; s.center = Vec3(U(5), U(-2), U(1)); s.radius = U(1);
+        auto aabb = Algo::ComputeAABB(s);
+        CHECK(aabb.min.x == U(4));
+        CHECK(aabb.min.y == U(-3));
+        CHECK(aabb.min.z == U(0));
+        CHECK(aabb.max.x == U(6));
+        CHECK(aabb.max.y == U(-1));
+        CHECK(aabb.max.z == U(2));
+    }
+
+    TEST_CASE("ComputeAABB OBB axis-aligned") {
+        OBB box;
+        box.center = Vec3(U(0), U(0), U(0));
+        box.half_extents = Vec3(U(2), U(3), U(4));
+        box.rotation = Mat3();
+        auto aabb = Algo::ComputeAABB(box);
+        CHECK(aabb.min.x == U(-2));
+        CHECK(aabb.min.y == U(-3));
+        CHECK(aabb.min.z == U(-4));
+        CHECK(aabb.max.x == U(2));
+        CHECK(aabb.max.y == U(3));
+        CHECK(aabb.max.z == U(4));
+    }
+
+    TEST_CASE("ComputeAABB OBB offset") {
+        OBB box;
+        box.center = Vec3(U(1), U(2), U(3));
+        box.half_extents = Vec3(U(1), U(1), U(1));
+        box.rotation = Mat3();
+        auto aabb = Algo::ComputeAABB(box);
+        CHECK(aabb.min.x == U(0));
+        CHECK(aabb.min.y == U(1));
+        CHECK(aabb.min.z == U(2));
+        CHECK(aabb.max.x == U(2));
+        CHECK(aabb.max.y == U(3));
+        CHECK(aabb.max.z == U(4));
+    }
+
+    TEST_CASE("ComputeAABB OBB rotated 90Y") {
+        OBB box;
+        box.center = Vec3(U(0), U(0), U(0));
+        box.half_extents = Vec3(U(3), U(1), U(1));
+        box.rotation = Mat3::RotateY(90);
+        // Long axis (3) now along world-Z
+        auto aabb = Algo::ComputeAABB(box);
+        CHECK(aabb.min.x == U(-1));
+        CHECK(aabb.min.y == U(-1));
+        CHECK(aabb.min.z == U(-3));
+        CHECK(aabb.max.x == U(1));
+        CHECK(aabb.max.y == U(1));
+        CHECK(aabb.max.z == U(3));
+    }
+
+    TEST_CASE("ComputeAABB capsule axis-aligned") {
+        Capsule c; c.start = Vec3(U(-3), U(0), U(0)); c.end = Vec3(U(5), U(0), U(0)); c.radius = U(1);
+        auto aabb = Algo::ComputeAABB(c);
+        CHECK(aabb.min.x == U(-4));
+        CHECK(aabb.min.y == U(-1));
+        CHECK(aabb.min.z == U(-1));
+        CHECK(aabb.max.x == U(6));
+        CHECK(aabb.max.y == U(1));
+        CHECK(aabb.max.z == U(1));
+    }
+
+    TEST_CASE("ComputeAABB capsule diagonal") {
+        Capsule c; c.start = Vec3(U(0), U(0), U(0)); c.end = Vec3(U(4), U(4), U(4)); c.radius = U(2);
+        auto aabb = Algo::ComputeAABB(c);
+        CHECK(aabb.min.x == U(-2));
+        CHECK(aabb.min.y == U(-2));
+        CHECK(aabb.min.z == U(-2));
+        CHECK(aabb.max.x == U(6));
+        CHECK(aabb.max.y == U(6));
+        CHECK(aabb.max.z == U(6));
+    }
+
+    TEST_CASE("OverlapAABB overlapping") {
+        AABB a; a.min = Vec3(U(0), U(0), U(0)); a.max = Vec3(U(4), U(4), U(4));
+        AABB b; b.min = Vec3(U(2), U(2), U(2)); b.max = Vec3(U(6), U(6), U(6));
+        CHECK(Algo::OverlapAABB(a, b));
+    }
+
+    TEST_CASE("OverlapAABB separated") {
+        AABB a; a.min = Vec3(U(0), U(0), U(0)); a.max = Vec3(U(2), U(2), U(2));
+        AABB b; b.min = Vec3(U(5), U(5), U(5)); b.max = Vec3(U(7), U(7), U(7));
+        CHECK(!Algo::OverlapAABB(a, b));
+    }
+
+    TEST_CASE("OverlapAABB touching") {
+        AABB a; a.min = Vec3(U(0), U(0), U(0)); a.max = Vec3(U(2), U(2), U(2));
+        AABB b; b.min = Vec3(U(2), U(0), U(0)); b.max = Vec3(U(4), U(2), U(2));
+        CHECK(Algo::OverlapAABB(a, b));
+    }
+
+    TEST_CASE("OverlapAABB contained") {
+        AABB a; a.min = Vec3(U(0), U(0), U(0)); a.max = Vec3(U(10), U(10), U(10));
+        AABB b; b.min = Vec3(U(2), U(2), U(2)); b.max = Vec3(U(4), U(4), U(4));
+        CHECK(Algo::OverlapAABB(a, b));
+    }
+
+    TEST_CASE("OverlapAABB separated on single axis") {
+        AABB a; a.min = Vec3(U(0), U(0), U(0)); a.max = Vec3(U(4), U(4), U(4));
+        AABB b; b.min = Vec3(U(1), U(5), U(1)); b.max = Vec3(U(3), U(7), U(3));
+        CHECK(!Algo::OverlapAABB(a, b));
+    }
+
+    TEST_CASE("UnionAABB disjoint") {
+        AABB a; a.min = Vec3(U(0), U(0), U(0)); a.max = Vec3(U(2), U(2), U(2));
+        AABB b; b.min = Vec3(U(5), U(5), U(5)); b.max = Vec3(U(7), U(7), U(7));
+        auto u = Algo::UnionAABB(a, b);
+        CHECK(u.min.x == U(0));
+        CHECK(u.min.y == U(0));
+        CHECK(u.min.z == U(0));
+        CHECK(u.max.x == U(7));
+        CHECK(u.max.y == U(7));
+        CHECK(u.max.z == U(7));
+    }
+
+    TEST_CASE("UnionAABB contained") {
+        AABB a; a.min = Vec3(U(0), U(0), U(0)); a.max = Vec3(U(10), U(10), U(10));
+        AABB b; b.min = Vec3(U(2), U(2), U(2)); b.max = Vec3(U(4), U(4), U(4));
+        auto u = Algo::UnionAABB(a, b);
+        CHECK(u.min.x == U(0));
+        CHECK(u.max.x == U(10));
+    }
+
+    TEST_CASE("UnionAABB identical") {
+        AABB a; a.min = Vec3(U(1), U(2), U(3)); a.max = Vec3(U(4), U(5), U(6));
+        auto u = Algo::UnionAABB(a, a);
+        CHECK(u.min == a.min);
+        CHECK(u.max == a.max);
+    }
+}
+
+// ============================================================================
+// LookAt
+// ============================================================================
+
+TEST_SUITE("LookAt") {
+    TEST_CASE("Z-forward looking along +X") {
+        auto m = LookAt(
+            Vec3(U(0), U(0), U(0)),
+            Vec3(U(1), U(0), U(0)),
+            Vec3(U(0), U(1), U(0)),
+            2);
+        // cols[2] (forward) should be (1,0,0)
+        CHECK(m.cols[2].x == U(1));
+        CHECK(m.cols[2].y == U(0));
+        CHECK(m.cols[2].z == U(0));
+    }
+
+    TEST_CASE("Z-forward looking along +Y with Z-up hint") {
+        auto m = LookAt(
+            Vec3(U(0), U(0), U(0)),
+            Vec3(U(0), U(1), U(0)),
+            Vec3(U(0), U(0), U(1)),
+            2);
+        CHECK(m.cols[2].x == U(0));
+        CHECK(m.cols[2].y == U(1));
+        CHECK(m.cols[2].z == U(0));
+    }
+
+    TEST_CASE("X-forward looking along +Z") {
+        auto m = LookAt(
+            Vec3(U(0), U(0), U(0)),
+            Vec3(U(0), U(0), U(1)),
+            Vec3(U(0), U(1), U(0)),
+            0);
+        CHECK(m.cols[0].x == U(0));
+        CHECK(m.cols[0].y == U(0));
+        CHECK(m.cols[0].z == U(1));
+    }
+
+    TEST_CASE("Y-forward looking along +X") {
+        auto m = LookAt(
+            Vec3(U(0), U(0), U(0)),
+            Vec3(U(1), U(0), U(0)),
+            Vec3(U(0), U(1), U(0)),
+            1);
+        CHECK(m.cols[1].x == U(1));
+        CHECK(m.cols[1].y == U(0));
+        CHECK(m.cols[1].z == U(0));
+    }
+
+    TEST_CASE("same position returns identity") {
+        auto m = LookAt(
+            Vec3(U(3), U(4), U(5)),
+            Vec3(U(3), U(4), U(5)),
+            Vec3(U(0), U(1), U(0)));
+        CHECK(m == Mat3());
+    }
+
+    TEST_CASE("result is orthonormal") {
+        auto m = LookAt(
+            Vec3(U(1), U(2), U(3)),
+            Vec3(U(4), U(6), U(1)),
+            Vec3(U(0), U(1), U(0)),
+            2);
+        // columns should have length ~1
+        Unit len0 = length(m.cols[0]);
+        Unit len1 = length(m.cols[1]);
+        Unit len2 = length(m.cols[2]);
+        // fixed-point tolerance: within 1/128
+        Unit tol = Unit{1} / Unit{128};
+        CHECK(abs(len0 - U(1)) < tol);
+        CHECK(abs(len1 - U(1)) < tol);
+        CHECK(abs(len2 - U(1)) < tol);
+        // columns should be orthogonal (dot products ~0)
+        CHECK(abs(m.cols[0].Dot(m.cols[1])) < tol);
+        CHECK(abs(m.cols[0].Dot(m.cols[2])) < tol);
+        CHECK(abs(m.cols[1].Dot(m.cols[2])) < tol);
+    }
+
+    TEST_CASE("forward parallel to up uses fallback") {
+        // looking along +Y with Y-up should still produce a valid matrix
+        auto m = LookAt(
+            Vec3(U(0), U(0), U(0)),
+            Vec3(U(0), U(1), U(0)),
+            Vec3(U(0), U(1), U(0)),
+            2);
+        // should not be identity (from != to), and cols[2] should be (0,1,0)
+        CHECK(m.cols[2].y == U(1));
+        // orthonormality
+        Unit tol = Unit{1} / Unit{128};
+        CHECK(abs(m.cols[0].Dot(m.cols[1])) < tol);
+    }
+}

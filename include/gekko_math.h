@@ -203,6 +203,7 @@ namespace GekkoMath {
                 Vec3(Unit{0}, Unit{0}, Unit{1})
             );
         }
+
     };
 
     // util funcs
@@ -226,6 +227,38 @@ namespace GekkoMath {
         Unit len = length(v);
         if (len == Unit{0}) return Vec3();
         return v / len;
+    }
+
+    // Builds a rotation matrix orienting forward_axis (0=X, 1=Y, 2=Z)
+    // from `from` toward `to`, with `up` as the up hint.
+    inline Mat3 LookAt(const Vec3& from, const Vec3& to, const Vec3& up, int forward_axis = 2) {
+        Vec3 fwd = to - from;
+        Unit len = length(fwd);
+        if (len == Unit{0}) return Mat3();
+        fwd = fwd / len;
+
+        Vec3 right = fwd.Cross(up);
+        Unit rlen = length(right);
+        if (rlen == Unit{0}) {
+            // fwd parallel to up — pick a fallback
+            Vec3 fallback = (abs(fwd.x) < abs(fwd.y))
+                ? Vec3(Unit{1}, Unit{0}, Unit{0})
+                : Vec3(Unit{0}, Unit{1}, Unit{0});
+            right = fwd.Cross(fallback);
+            rlen = length(right);
+        }
+        right = right / rlen;
+        Vec3 actual_up = right.Cross(fwd);
+
+        switch (forward_axis) {
+        case 0: // X-forward
+            return Mat3(fwd, actual_up, right);
+        case 1: // Y-forward
+            return Mat3(right, fwd, actual_up);
+        case 2: // Z-forward (default)
+        default:
+            return Mat3(right, actual_up, fwd);
+        }
     }
 
 }

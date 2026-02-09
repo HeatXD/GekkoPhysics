@@ -238,4 +238,66 @@ namespace GekkoPhysics {
 		result.normal = min_axis;
 		return result;
 	}
+
+	AABB Algo::ComputeAABB(const Sphere& sphere) {
+		AABB aabb;
+		aabb.min = sphere.center - sphere.radius;
+		aabb.max = sphere.center + sphere.radius;
+		return aabb;
+	}
+
+	AABB Algo::ComputeAABB(const OBB& obb) {
+		// extent[i] = sum_j |cols[j].component_i| * half_extents[j]
+		Unit ex = GekkoMath::abs(obb.rotation.cols[0].x) * obb.half_extents.x
+				+ GekkoMath::abs(obb.rotation.cols[1].x) * obb.half_extents.y
+				+ GekkoMath::abs(obb.rotation.cols[2].x) * obb.half_extents.z;
+		Unit ey = GekkoMath::abs(obb.rotation.cols[0].y) * obb.half_extents.x
+				+ GekkoMath::abs(obb.rotation.cols[1].y) * obb.half_extents.y
+				+ GekkoMath::abs(obb.rotation.cols[2].y) * obb.half_extents.z;
+		Unit ez = GekkoMath::abs(obb.rotation.cols[0].z) * obb.half_extents.x
+				+ GekkoMath::abs(obb.rotation.cols[1].z) * obb.half_extents.y
+				+ GekkoMath::abs(obb.rotation.cols[2].z) * obb.half_extents.z;
+
+		Vec3 extent(ex, ey, ez);
+		AABB aabb;
+		aabb.min = obb.center - extent;
+		aabb.max = obb.center + extent;
+		return aabb;
+	}
+
+	AABB Algo::ComputeAABB(const Capsule& capsule) {
+		Unit min_x = (capsule.start.x < capsule.end.x ? capsule.start.x : capsule.end.x) - capsule.radius;
+		Unit min_y = (capsule.start.y < capsule.end.y ? capsule.start.y : capsule.end.y) - capsule.radius;
+		Unit min_z = (capsule.start.z < capsule.end.z ? capsule.start.z : capsule.end.z) - capsule.radius;
+		Unit max_x = (capsule.start.x > capsule.end.x ? capsule.start.x : capsule.end.x) + capsule.radius;
+		Unit max_y = (capsule.start.y > capsule.end.y ? capsule.start.y : capsule.end.y) + capsule.radius;
+		Unit max_z = (capsule.start.z > capsule.end.z ? capsule.start.z : capsule.end.z) + capsule.radius;
+
+		AABB aabb;
+		aabb.min = Vec3(min_x, min_y, min_z);
+		aabb.max = Vec3(max_x, max_y, max_z);
+		return aabb;
+	}
+
+	bool Algo::OverlapAABB(const AABB& a, const AABB& b) {
+		if (a.max.x < b.min.x || b.max.x < a.min.x) return false;
+		if (a.max.y < b.min.y || b.max.y < a.min.y) return false;
+		if (a.max.z < b.min.z || b.max.z < a.min.z) return false;
+		return true;
+	}
+
+	AABB Algo::UnionAABB(const AABB& a, const AABB& b) {
+		AABB result;
+		result.min = Vec3(
+			a.min.x < b.min.x ? a.min.x : b.min.x,
+			a.min.y < b.min.y ? a.min.y : b.min.y,
+			a.min.z < b.min.z ? a.min.z : b.min.z
+		);
+		result.max = Vec3(
+			a.max.x > b.max.x ? a.max.x : b.max.x,
+			a.max.y > b.max.y ? a.max.y : b.max.y,
+			a.max.z > b.max.z ? a.max.z : b.max.z
+		);
+		return result;
+	}
 }

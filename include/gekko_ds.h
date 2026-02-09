@@ -392,6 +392,9 @@ namespace GekkoDS {
         const T* end() const { return _dense.begin() + _active_count; }
 
         const T* end_set() const { return _dense.begin() + size(); }
+
+        // Returns the entity ID for a given dense index.
+        Q entity_id(uint32_t dense_index) const { return _entities[dense_index]; }
     };
 
     template <typename T>

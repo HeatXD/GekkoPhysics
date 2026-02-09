@@ -1,6 +1,9 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest/doctest.h"
 
+#include <chrono>
+#include <sstream>
+
 #include "gekko_math.h"
 #include "gekko_ds.h"
 #include "gekko_physics.h"
@@ -1017,5 +1020,501 @@ TEST_SUITE("World") {
         CHECK(s != INVALID_ID);
 
         world.Update();
+    }
+}
+
+// ============================================================================
+// Collision Pipeline tests
+// ============================================================================
+
+TEST_SUITE("Collision Pipeline") {
+    TEST_CASE("overlapping spheres produce contact") {
+        World world;
+        auto b1 = world.CreateBody();
+        auto b2 = world.CreateBody();
+
+        // Place bodies in world space
+        world.GetBody(b2).position = Vec3(Unit{3}, Unit{0}, Unit{0});
+
+        auto g1 = world.AddShapeGroup(b1);
+        auto g2 = world.AddShapeGroup(b2);
+
+        world.GetShapeGroup(g1).layer = 1;
+        world.GetShapeGroup(g1).mask = 1;
+        world.GetShapeGroup(g2).layer = 1;
+        world.GetShapeGroup(g2).mask = 1;
+
+        auto s1 = world.AddShape(g1, Shape::Sphere);
+        auto s2 = world.AddShape(g2, Shape::Sphere);
+
+        // Shape centers at local origin, radius set
+        world.GetSphere(world.GetShape(s1).shape_type_id).radius = Unit{2};
+        world.GetSphere(world.GetShape(s2).shape_type_id).radius = Unit{2};
+
+        world.Update();
+
+        auto& contacts = world.GetContacts();
+        CHECK(contacts.size() == 1);
+        CHECK(contacts[0].body_a != contacts[0].body_b);
+        CHECK(contacts[0].depth == Unit{1});
+    }
+
+    TEST_CASE("separated spheres produce no contact") {
+        World world;
+        auto b1 = world.CreateBody();
+        auto b2 = world.CreateBody();
+
+        world.GetBody(b2).position = Vec3(Unit{10}, Unit{0}, Unit{0});
+
+        auto g1 = world.AddShapeGroup(b1);
+        auto g2 = world.AddShapeGroup(b2);
+
+        world.GetShapeGroup(g1).layer = 1;
+        world.GetShapeGroup(g1).mask = 1;
+        world.GetShapeGroup(g2).layer = 1;
+        world.GetShapeGroup(g2).mask = 1;
+
+        auto s1 = world.AddShape(g1, Shape::Sphere);
+        auto s2 = world.AddShape(g2, Shape::Sphere);
+
+        world.GetSphere(world.GetShape(s1).shape_type_id).radius = Unit{1};
+        world.GetSphere(world.GetShape(s2).shape_type_id).radius = Unit{1};
+
+        world.Update();
+
+        CHECK(world.GetContacts().size() == 0);
+    }
+
+    TEST_CASE("static vs static skipped") {
+        World world;
+        auto b1 = world.CreateBody();
+        auto b2 = world.CreateBody();
+
+        world.GetBody(b1).is_static = true;
+        world.GetBody(b2).is_static = true;
+        world.GetBody(b2).position = Vec3(Unit{1}, Unit{0}, Unit{0});
+
+        auto g1 = world.AddShapeGroup(b1);
+        auto g2 = world.AddShapeGroup(b2);
+
+        world.GetShapeGroup(g1).layer = 1;
+        world.GetShapeGroup(g1).mask = 1;
+        world.GetShapeGroup(g2).layer = 1;
+        world.GetShapeGroup(g2).mask = 1;
+
+        auto s1 = world.AddShape(g1, Shape::Sphere);
+        auto s2 = world.AddShape(g2, Shape::Sphere);
+
+        world.GetSphere(world.GetShape(s1).shape_type_id).radius = Unit{2};
+        world.GetSphere(world.GetShape(s2).shape_type_id).radius = Unit{2};
+
+        world.Update();
+
+        CHECK(world.GetContacts().size() == 0);
+    }
+
+    TEST_CASE("layer mask filtering") {
+        World world;
+        auto b1 = world.CreateBody();
+        auto b2 = world.CreateBody();
+
+        world.GetBody(b2).position = Vec3(Unit{1}, Unit{0}, Unit{0});
+
+        auto g1 = world.AddShapeGroup(b1);
+        auto g2 = world.AddShapeGroup(b2);
+
+        // different layers, masks don't match
+        world.GetShapeGroup(g1).layer = 1;
+        world.GetShapeGroup(g1).mask = 1;
+        world.GetShapeGroup(g2).layer = 2;
+        world.GetShapeGroup(g2).mask = 2;
+
+        auto s1 = world.AddShape(g1, Shape::Sphere);
+        auto s2 = world.AddShape(g2, Shape::Sphere);
+
+        world.GetSphere(world.GetShape(s1).shape_type_id).radius = Unit{5};
+        world.GetSphere(world.GetShape(s2).shape_type_id).radius = Unit{5};
+
+        world.Update();
+
+        CHECK(world.GetContacts().size() == 0);
+    }
+
+    TEST_CASE("same body skip") {
+        World world;
+        auto b1 = world.CreateBody();
+
+        auto g1 = world.AddShapeGroup(b1);
+        auto g2 = world.AddShapeGroup(b1);
+
+        world.GetShapeGroup(g1).layer = 1;
+        world.GetShapeGroup(g1).mask = 1;
+        world.GetShapeGroup(g2).layer = 1;
+        world.GetShapeGroup(g2).mask = 1;
+
+        auto s1 = world.AddShape(g1, Shape::Sphere);
+        auto s2 = world.AddShape(g2, Shape::Sphere);
+
+        // local offsets within same body
+        world.GetSphere(world.GetShape(s1).shape_type_id).radius = Unit{5};
+        world.GetSphere(world.GetShape(s2).shape_type_id).center = Vec3(Unit{1}, Unit{0}, Unit{0});
+        world.GetSphere(world.GetShape(s2).shape_type_id).radius = Unit{5};
+
+        world.Update();
+
+        CHECK(world.GetContacts().size() == 0);
+    }
+
+    TEST_CASE("contacts cleared between frames") {
+        World world;
+        auto b1 = world.CreateBody();
+        auto b2 = world.CreateBody();
+
+        world.GetBody(b2).position = Vec3(Unit{3}, Unit{0}, Unit{0});
+
+        auto g1 = world.AddShapeGroup(b1);
+        auto g2 = world.AddShapeGroup(b2);
+
+        world.GetShapeGroup(g1).layer = 1;
+        world.GetShapeGroup(g1).mask = 1;
+        world.GetShapeGroup(g2).layer = 1;
+        world.GetShapeGroup(g2).mask = 1;
+
+        auto s1 = world.AddShape(g1, Shape::Sphere);
+        auto s2 = world.AddShape(g2, Shape::Sphere);
+
+        world.GetSphere(world.GetShape(s1).shape_type_id).radius = Unit{2};
+        world.GetSphere(world.GetShape(s2).shape_type_id).radius = Unit{2};
+
+        world.Update();
+        CHECK(world.GetContacts().size() == 1);
+
+        // separate them by moving body
+        world.GetBody(b2).position = Vec3(Unit{20}, Unit{0}, Unit{0});
+        world.Update();
+        CHECK(world.GetContacts().size() == 0);
+    }
+
+    TEST_CASE("sphere vs OBB mixed types") {
+        World world;
+        auto b1 = world.CreateBody();
+        auto b2 = world.CreateBody();
+
+        world.GetBody(b1).position = Vec3(Unit{3}, Unit{0}, Unit{0});
+
+        auto g1 = world.AddShapeGroup(b1);
+        auto g2 = world.AddShapeGroup(b2);
+
+        world.GetShapeGroup(g1).layer = 1;
+        world.GetShapeGroup(g1).mask = 1;
+        world.GetShapeGroup(g2).layer = 1;
+        world.GetShapeGroup(g2).mask = 1;
+
+        auto s1 = world.AddShape(g1, Shape::Sphere);
+        auto s2 = world.AddShape(g2, Shape::OBB);
+
+        world.GetSphere(world.GetShape(s1).shape_type_id).radius = Unit{1};
+
+        auto& obb = world.GetOBB(world.GetShape(s2).shape_type_id);
+        obb.half_extents = Vec3(Unit{2}, Unit{2}, Unit{2});
+
+        world.Update();
+
+        auto& contacts = world.GetContacts();
+        CHECK(contacts.size() == 1);
+        CHECK(contacts[0].depth == Unit{0}); // just touching
+    }
+
+    TEST_CASE("body transform applies to spheres") {
+        World world;
+        auto b1 = world.CreateBody();
+        auto b2 = world.CreateBody();
+
+        // Bodies at origin, shapes with local offset
+        world.GetBody(b1).position = Vec3(Unit{0}, Unit{0}, Unit{0});
+        world.GetBody(b2).position = Vec3(Unit{5}, Unit{0}, Unit{0});
+
+        auto g1 = world.AddShapeGroup(b1);
+        auto g2 = world.AddShapeGroup(b2);
+        world.GetShapeGroup(g1).layer = 1; world.GetShapeGroup(g1).mask = 1;
+        world.GetShapeGroup(g2).layer = 1; world.GetShapeGroup(g2).mask = 1;
+
+        auto s1 = world.AddShape(g1, Shape::Sphere);
+        auto s2 = world.AddShape(g2, Shape::Sphere);
+
+        // Local offset of 1 unit along X for each
+        world.GetSphere(world.GetShape(s1).shape_type_id).center = Vec3(Unit{1}, Unit{0}, Unit{0});
+        world.GetSphere(world.GetShape(s1).shape_type_id).radius = Unit{1};
+        world.GetSphere(world.GetShape(s2).shape_type_id).center = Vec3(Unit{-1}, Unit{0}, Unit{0});
+        world.GetSphere(world.GetShape(s2).shape_type_id).radius = Unit{1};
+
+        // World positions: sphere1 at (1,0,0), sphere2 at (4,0,0). Distance=3, sum_r=2 => no contact
+        world.Update();
+        CHECK(world.GetContacts().size() == 0);
+
+        // Move b2 closer so they overlap
+        world.GetBody(b2).position = Vec3(Unit{3}, Unit{0}, Unit{0});
+        // sphere1 at (1,0,0), sphere2 at (2,0,0). Distance=1, sum_r=2 => depth=1
+        world.Update();
+        CHECK(world.GetContacts().size() == 1);
+        CHECK(world.GetContacts()[0].depth == Unit{1});
+    }
+
+    TEST_CASE("body rotation applies to shapes") {
+        World world;
+        auto b1 = world.CreateBody();
+        auto b2 = world.CreateBody();
+
+        // Body 1 at origin, rotated 90 deg around Z (X->Y, Y->-X)
+        world.GetBody(b1).rotation = Mat3::RotateZ(90);
+
+        // Body 2 at (0, 3, 0)
+        world.GetBody(b2).position = Vec3(Unit{0}, Unit{3}, Unit{0});
+
+        auto g1 = world.AddShapeGroup(b1);
+        auto g2 = world.AddShapeGroup(b2);
+        world.GetShapeGroup(g1).layer = 1; world.GetShapeGroup(g1).mask = 1;
+        world.GetShapeGroup(g2).layer = 1; world.GetShapeGroup(g2).mask = 1;
+
+        auto s1 = world.AddShape(g1, Shape::Sphere);
+        auto s2 = world.AddShape(g2, Shape::Sphere);
+
+        // Sphere 1 at local (2,0,0), after 90Z rotation -> world (0,2,0)
+        world.GetSphere(world.GetShape(s1).shape_type_id).center = Vec3(Unit{2}, Unit{0}, Unit{0});
+        world.GetSphere(world.GetShape(s1).shape_type_id).radius = Unit{1};
+        world.GetSphere(world.GetShape(s2).shape_type_id).radius = Unit{1};
+
+        // World: s1 at (0,2,0), s2 at (0,3,0). Distance=1, sum_r=2 => depth=1
+        world.Update();
+        CHECK(world.GetContacts().size() == 1);
+        CHECK(world.GetContacts()[0].depth == Unit{1});
+    }
+
+    TEST_CASE("body transform applies to OBB") {
+        World world;
+        auto b1 = world.CreateBody();
+        auto b2 = world.CreateBody();
+
+        world.GetBody(b1).position = Vec3(Unit{0}, Unit{0}, Unit{0});
+        world.GetBody(b2).position = Vec3(Unit{4}, Unit{0}, Unit{0});
+        // Rotate body2 90 deg around Y, so OBB's local X-axis (half=3) maps to world Z
+        world.GetBody(b2).rotation = Mat3::RotateY(90);
+
+        auto g1 = world.AddShapeGroup(b1);
+        auto g2 = world.AddShapeGroup(b2);
+        world.GetShapeGroup(g1).layer = 1; world.GetShapeGroup(g1).mask = 1;
+        world.GetShapeGroup(g2).layer = 1; world.GetShapeGroup(g2).mask = 1;
+
+        auto s1 = world.AddShape(g1, Shape::Sphere);
+        auto s2 = world.AddShape(g2, Shape::OBB);
+
+        world.GetSphere(world.GetShape(s1).shape_type_id).radius = Unit{2};
+        auto& obb = world.GetOBB(world.GetShape(s2).shape_type_id);
+        obb.half_extents = Vec3(Unit{3}, Unit{1}, Unit{1});
+        // OBB local rotation is identity, body rotation rotates it
+
+        // World OBB at (4,0,0), rotated 90Y: projects 1 along world X from center
+        // Closest on OBB X-axis = 4-1 = 3, sphere at 0 with r=2, dist=3 > 2 => no hit
+        world.Update();
+        CHECK(world.GetContacts().size() == 0);
+
+        // Move body2 closer
+        world.GetBody(b2).position = Vec3(Unit{2}, Unit{0}, Unit{0});
+        // Closest on OBB = 2-1 = 1, dist=1, r=2 => depth=1
+        world.Update();
+        CHECK(world.GetContacts().size() == 1);
+        CHECK(world.GetContacts()[0].depth == Unit{1});
+    }
+}
+
+// ============================================================================
+// Integration tests
+// ============================================================================
+
+TEST_SUITE("Integration") {
+    TEST_CASE("iteration benchmark") {
+        World world;
+        const int N = 100;
+
+        // Create N bodies in a 10x10 grid, spacing 3, radius 2 => neighbors overlap
+        for (int i = 0; i < N; i++) {
+            auto bid = world.CreateBody();
+            int row = i / 10;
+            int col = i % 10;
+            world.GetBody(bid).position = Vec3(Unit{col * 3}, Unit{0}, Unit{row * 3});
+
+            auto gid = world.AddShapeGroup(bid);
+            world.GetShapeGroup(gid).layer = 1;
+            world.GetShapeGroup(gid).mask = 1;
+
+            auto sid = world.AddShape(gid, Shape::Sphere);
+            world.GetSphere(world.GetShape(sid).shape_type_id).radius = Unit{2};
+        }
+
+        const int M = 100;
+        auto start = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < M; i++) {
+            world.Update();
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        auto ms = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+        auto& contacts = world.GetContacts();
+
+        std::ostringstream log;
+        log << "bodies=" << N
+            << " iterations=" << M
+            << " total_us=" << ms
+            << " per_iter_us=" << (ms / M)
+            << " contacts=" << contacts.size();
+        MESSAGE(log.str());
+
+        CHECK(contacts.size() > 0);
+    }
+
+    TEST_CASE("save load roundtrip with contacts") {
+        World world;
+
+        // Body A: sphere at origin
+        auto ba = world.CreateBody();
+        auto ga = world.AddShapeGroup(ba);
+        world.GetShapeGroup(ga).layer = 1;
+        world.GetShapeGroup(ga).mask = 1;
+        auto sa = world.AddShape(ga, Shape::Sphere);
+        world.GetSphere(world.GetShape(sa).shape_type_id).radius = Unit{2};
+
+        // Body B: OBB at (3,0,0)
+        auto bb = world.CreateBody();
+        world.GetBody(bb).position = Vec3(Unit{3}, Unit{0}, Unit{0});
+        auto gb = world.AddShapeGroup(bb);
+        world.GetShapeGroup(gb).layer = 1;
+        world.GetShapeGroup(gb).mask = 1;
+        auto sb = world.AddShape(gb, Shape::OBB);
+        auto& obb = world.GetOBB(world.GetShape(sb).shape_type_id);
+        obb.half_extents = Vec3(Unit{2}, Unit{2}, Unit{2});
+
+        // Body C: capsule at (0,0,3)
+        auto bc = world.CreateBody();
+        world.GetBody(bc).position = Vec3(Unit{0}, Unit{0}, Unit{3});
+        auto gc = world.AddShapeGroup(bc);
+        world.GetShapeGroup(gc).layer = 1;
+        world.GetShapeGroup(gc).mask = 1;
+        auto sc = world.AddShape(gc, Shape::Capsule);
+        auto& cap = world.GetCapsule(world.GetShape(sc).shape_type_id);
+        cap.start = Vec3(Unit{-2}, Unit{0}, Unit{0});
+        cap.end = Vec3(Unit{2}, Unit{0}, Unit{0});
+        cap.radius = Unit{1};
+
+        world.Update();
+        uint32_t contacts_before = world.GetContacts().size();
+        CHECK(contacts_before > 0);
+
+        // Save
+        MemStream stream;
+        auto save_start = std::chrono::high_resolution_clock::now();
+        world.Save(stream);
+        auto save_end = std::chrono::high_resolution_clock::now();
+        uint32_t save_size = (uint32_t)stream.size();
+        stream.rewind();
+
+        // Load
+        World world2;
+        auto load_start = std::chrono::high_resolution_clock::now();
+        world2.Load(stream);
+        auto load_end = std::chrono::high_resolution_clock::now();
+        world2.Update();
+        uint32_t contacts_after = world2.GetContacts().size();
+
+        auto save_us = std::chrono::duration_cast<std::chrono::microseconds>(save_end - save_start).count();
+        auto load_us = std::chrono::duration_cast<std::chrono::microseconds>(load_end - load_start).count();
+
+        std::ostringstream log;
+        log << "save_bytes=" << save_size
+            << " save_us=" << save_us
+            << " load_us=" << load_us
+            << " contacts_before=" << contacts_before
+            << " contacts_after=" << contacts_after;
+        MESSAGE(log.str());
+
+        CHECK(contacts_before == contacts_after);
+
+        // Re-save loaded world and memcmp
+        MemStream stream2;
+        world2.Save(stream2);
+        CHECK(stream.size() == stream2.size());
+        CHECK(std::memcmp(stream.data(), stream2.data(), stream.size()) == 0);
+    }
+
+    TEST_CASE("save load large world") {
+        World world;
+        const int BODY_COUNT = 50;
+
+        for (int i = 0; i < BODY_COUNT; i++) {
+            auto bid = world.CreateBody();
+            world.GetBody(bid).position = Vec3(Unit{i * 2}, Unit{0}, Unit{0});
+
+            auto gid = world.AddShapeGroup(bid);
+            world.GetShapeGroup(gid).layer = 1;
+            world.GetShapeGroup(gid).mask = 1;
+
+            // Alternate shape types
+            Shape::Type type;
+            switch (i % 3) {
+            case 0: type = Shape::Sphere; break;
+            case 1: type = Shape::OBB; break;
+            default: type = Shape::Capsule; break;
+            }
+
+            auto sid = world.AddShape(gid, type);
+            switch (type) {
+            case Shape::Sphere:
+                world.GetSphere(world.GetShape(sid).shape_type_id).radius = Unit{1};
+                break;
+            case Shape::OBB: {
+                auto& o = world.GetOBB(world.GetShape(sid).shape_type_id);
+                o.half_extents = Vec3(Unit{1}, Unit{1}, Unit{1});
+                break;
+            }
+            case Shape::Capsule: {
+                auto& c = world.GetCapsule(world.GetShape(sid).shape_type_id);
+                c.start = Vec3(Unit{0}, Unit{-1}, Unit{0});
+                c.end = Vec3(Unit{0}, Unit{1}, Unit{0});
+                c.radius = Unit{1};
+                break;
+            }
+            default: break;
+            }
+        }
+
+        // Save
+        MemStream stream1;
+        auto save_start = std::chrono::high_resolution_clock::now();
+        world.Save(stream1);
+        auto save_end = std::chrono::high_resolution_clock::now();
+        stream1.rewind();
+
+        // Load
+        World world2;
+        auto load_start = std::chrono::high_resolution_clock::now();
+        world2.Load(stream1);
+        auto load_end = std::chrono::high_resolution_clock::now();
+
+        // Re-save and compare
+        MemStream stream2;
+        world2.Save(stream2);
+
+        auto save_us = std::chrono::duration_cast<std::chrono::microseconds>(save_end - save_start).count();
+        auto load_us = std::chrono::duration_cast<std::chrono::microseconds>(load_end - load_start).count();
+
+        std::ostringstream log;
+        log << "bodies=" << BODY_COUNT
+            << " save1_bytes=" << stream1.size()
+            << " save2_bytes=" << stream2.size()
+            << " save_us=" << save_us
+            << " load_us=" << load_us;
+        MESSAGE(log.str());
+
+        CHECK(stream1.size() == stream2.size());
+        CHECK(std::memcmp(stream1.data(), stream2.data(), stream1.size()) == 0);
     }
 }

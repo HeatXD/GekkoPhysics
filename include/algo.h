@@ -1,15 +1,9 @@
 #pragma once
 
-#include "gekko_physics.h"
+#include "gekko_shapes.h"
 
 namespace GekkoPhysics {
 	using namespace GekkoMath;
-
-	struct CollisionResult {
-		bool hit = false;
-		Vec3 normal;
-		Unit depth;
-	};
 
 	class Algo {
 	public:
@@ -23,5 +17,11 @@ namespace GekkoPhysics {
 		static CollisionResult CollideSphereOBB(const Sphere& a, const OBB& b);
 		static CollisionResult CollideCapsuleOBB(const Capsule& a, const OBB& b);
 		static CollisionResult CollideOBBs(const OBB& a, const OBB& b);
+
+		static AABB ComputeAABB(const Sphere& sphere);
+		static AABB ComputeAABB(const OBB& obb);
+		static AABB ComputeAABB(const Capsule& capsule);
+		static bool OverlapAABB(const AABB& a, const AABB& b);
+		static AABB UnionAABB(const AABB& a, const AABB& b);
 	};
 }

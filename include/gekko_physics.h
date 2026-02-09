@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gekko_ds.h"
-#include "gekko_math.h"
+#include "gekko_shapes.h"
 
 namespace GekkoPhysics {
 	using Identifier = int16_t;
@@ -9,22 +9,6 @@ namespace GekkoPhysics {
 	using namespace GekkoMath;
 
 	static const Identifier INVALID_ID = -1;
-
-	struct OBB {
-		Vec3 center;
-		Vec3 half_extents;
-		Mat3 rotation;
-	};
-
-	struct Sphere {
-		Vec3 center;
-		Unit radius;
-	};
-
-	struct Capsule {
-		Vec3 start, end;
-		Unit radius;
-	};
 
 	struct Shape {
 		Identifier shape_type_id = INVALID_ID;
@@ -60,6 +44,15 @@ namespace GekkoPhysics {
 		void Reset();
 	};
 
+	struct ContactPair {
+		Identifier body_a = INVALID_ID;
+		Identifier body_b = INVALID_ID;
+		Identifier shape_a = INVALID_ID;
+		Identifier shape_b = INVALID_ID;
+		Vec3 normal;
+		Unit depth;
+	};
+
 	class World {
 		SparseSet<Identifier, Body> _bodies;
 		SparseSet<Identifier, ShapeGroup> _shape_groups;
@@ -70,6 +63,8 @@ namespace GekkoPhysics {
 		SparseSet<Identifier, OBB> _obbs;
 		SparseSet<Identifier, Sphere> _spheres;
 		SparseSet<Identifier, Capsule> _capsules;
+
+		Vec<ContactPair> _contacts;
 
 		Vec3 _origin, _up;
 		Unit _update_rate { 60 };
@@ -98,10 +93,25 @@ namespace GekkoPhysics {
 
 		void Update();
 
+		Body& GetBody(Identifier id);
+		ShapeGroup& GetShapeGroup(Identifier id);
+		Shape& GetShape(Identifier id);
+		Sphere& GetSphere(Identifier id);
+		OBB& GetOBB(Identifier id);
+		Capsule& GetCapsule(Identifier id);
+		const Vec<ContactPair>& GetContacts() const;
+
 	private:
 		// Create a link between entites.
 		Identifier CreateLink();
 
+		// Transform body-local shapes to world space.
+		Sphere WorldSphere(const Sphere& local, const Body& body) const;
+		OBB WorldOBB(const OBB& local, const Body& body) const;
+		Capsule WorldCapsule(const Capsule& local, const Body& body) const;
+
 		void CheckCollisions();
+		CollisionResult CollideShapes(const Shape& a, const Body& body_a, const Shape& b, const Body& body_b) const;
+		AABB ComputeShapeGroupAABB(const ShapeGroup& group, const Body& body) const;
 	};
 }
