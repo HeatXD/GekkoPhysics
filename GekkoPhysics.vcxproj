@@ -143,6 +143,7 @@
     <ClInclude Include="include\fpm\math.hpp" />
     <ClInclude Include="include\gekko_ds.h" />
     <ClInclude Include="include\gekko_math.h" />
+    <ClInclude Include="include\gekko_shapes.h" />
     <ClInclude Include="include\gekko_physics.h" />
     <ClInclude Include="include\algo.h" />
   </ItemGroup>

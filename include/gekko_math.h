@@ -9,7 +9,15 @@ namespace GekkoMath {
     // VISUALIZATION ONLY
     struct Vec3F {
         float x, y, z;
+        Vec3F() : x(0), y(0), z(0) {}
         Vec3F(float xx, float yy, float zz) : x(xx), y(yy), z(zz) {}
+    };
+
+    // VISUALIZATION ONLY
+    struct Mat3F {
+        Vec3F cols[3];
+        Mat3F() : cols{{0,0,0},{0,0,0},{0,0,0}} {}
+        Mat3F(const Vec3F& c0, const Vec3F& c1, const Vec3F& c2) : cols{c0, c1, c2} {}
     };
 
     struct Vec3 {
@@ -193,6 +201,11 @@ namespace GekkoMath {
                 Vec3(Unit{0}, Unit{1}, Unit{0}),
                 Vec3(s, Unit{0}, c)
             );
+        }
+
+        // VISUALIZATION ONLY
+        Mat3F AsFloat() const {
+            return Mat3F(cols[0].AsFloat(), cols[1].AsFloat(), cols[2].AsFloat());
         }
 
         static Mat3 RotateZ(int deg) {

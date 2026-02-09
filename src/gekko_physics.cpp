@@ -267,6 +267,105 @@ namespace GekkoPhysics {
 		return _contacts;
 	}
 
+	void World::SetDebugDraw(DebugDraw* dd) {
+		_debug_draw = dd;
+	}
+
+	void World::DrawDebug() const {
+		if (!_debug_draw) return;
+
+		const uint32_t f = _debug_draw->flags;
+
+		// Colors
+		const Color green(0.0f, 1.0f, 0.0f);
+		const Color yellow(1.0f, 1.0f, 0.0f);
+		const Color red(1.0f, 0.0f, 0.0f);
+		const Color orange(1.0f, 0.5f, 0.0f);
+		const Color axis_r(1.0f, 0.0f, 0.0f);
+		const Color axis_g(0.0f, 1.0f, 0.0f);
+		const Color axis_b(0.0f, 0.0f, 1.0f);
+
+		// Iterate bodies
+		const uint32_t body_count = _bodies.active_size();
+		for (uint32_t bi = 0; bi < body_count; bi++) {
+			Identifier body_id = _bodies.entity_id(bi);
+			const Body& body = _bodies.get(body_id);
+
+			// Body axes
+			if (f & DrawFlag_BodyAxes) {
+				Vec3F pos = body.position.AsFloat();
+				Mat3F rot = body.rotation.AsFloat();
+				_debug_draw->DrawLine(pos, Vec3F(pos.x + rot.cols[0].x, pos.y + rot.cols[0].y, pos.z + rot.cols[0].z), axis_r);
+				_debug_draw->DrawLine(pos, Vec3F(pos.x + rot.cols[1].x, pos.y + rot.cols[1].y, pos.z + rot.cols[1].z), axis_g);
+				_debug_draw->DrawLine(pos, Vec3F(pos.x + rot.cols[2].x, pos.y + rot.cols[2].y, pos.z + rot.cols[2].z), axis_b);
+			}
+
+			// Iterate shape groups
+			if (body.link_shape_groups == INVALID_ID) continue;
+			const auto& group_link = _links.get(body.link_shape_groups);
+
+			for (size_t gi = 0; gi < Link::NUM_LINKS; gi++) {
+				Identifier group_id = group_link.children[gi];
+				if (group_id == INVALID_ID || !_shape_groups.contains(group_id)) continue;
+				const ShapeGroup& group = _shape_groups.get(group_id);
+
+				// AABB
+				if (f & DrawFlag_AABBs) {
+					AABB aabb = ComputeShapeGroupAABB(group, body);
+					_debug_draw->DrawAABB(aabb.min.AsFloat(), aabb.max.AsFloat(), yellow);
+				}
+
+				// Shapes
+				if (f & DrawFlag_Shapes) {
+					if (group.link_shapes == INVALID_ID) continue;
+					const auto& shape_link = _links.get(group.link_shapes);
+
+					for (size_t si = 0; si < Link::NUM_LINKS; si++) {
+						Identifier shape_id = shape_link.children[si];
+						if (shape_id == INVALID_ID || !_shapes.contains(shape_id)) continue;
+						const Shape& shape = _shapes.get(shape_id);
+
+						switch (shape.type) {
+						case Shape::Sphere: {
+							Sphere ws = WorldSphere(_spheres.get(shape.shape_type_id), body);
+							_debug_draw->DrawSphere(ws.center.AsFloat(), static_cast<float>(ws.radius), green);
+						} break;
+						case Shape::OBB: {
+							OBB wo = WorldOBB(_obbs.get(shape.shape_type_id), body);
+							_debug_draw->DrawBox(wo.center.AsFloat(), wo.half_extents.AsFloat(), wo.rotation.AsFloat(), green);
+						} break;
+						case Shape::Capsule: {
+							Capsule wc = WorldCapsule(_capsules.get(shape.shape_type_id), body);
+							_debug_draw->DrawCapsule(wc.start.AsFloat(), wc.end.AsFloat(), static_cast<float>(wc.radius), green);
+						} break;
+						default: break;
+						}
+					}
+				}
+			}
+		}
+
+		// Contacts
+		if (f & DrawFlag_Contacts) {
+			for (uint32_t ci = 0; ci < _contacts.size(); ci++) {
+				const ContactPair& cp = _contacts[ci];
+				const Body& ba = _bodies.get(cp.body_a);
+				const Body& bb = _bodies.get(cp.body_b);
+				Vec3F pa = ba.position.AsFloat();
+				Vec3F pb = bb.position.AsFloat();
+				Vec3F mid(
+					(pa.x + pb.x) * 0.5f,
+					(pa.y + pb.y) * 0.5f,
+					(pa.z + pb.z) * 0.5f
+				);
+				_debug_draw->DrawPoint(mid, 5.0f, red);
+
+				Vec3F n = cp.normal.AsFloat();
+				_debug_draw->DrawLine(mid, Vec3F(mid.x + n.x, mid.y + n.y, mid.z + n.z), orange);
+			}
+		}
+	}
+
 	Sphere World::WorldSphere(const Sphere& local, const Body& body) const {
 		Sphere w;
 		w.center = body.position + body.rotation * local.center;

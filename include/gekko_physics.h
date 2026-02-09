@@ -2,6 +2,7 @@
 
 #include "gekko_ds.h"
 #include "gekko_shapes.h"
+#include "gekko_debug_draw.h"
 
 namespace GekkoPhysics {
 	using Identifier = int16_t;
@@ -101,7 +102,11 @@ namespace GekkoPhysics {
 		Capsule& GetCapsule(Identifier id);
 		const Vec<ContactPair>& GetContacts() const;
 
+		void SetDebugDraw(DebugDraw* dd);
+		void DrawDebug() const;
+
 	private:
+		DebugDraw* _debug_draw = nullptr;
 		// Create a link between entites.
 		Identifier CreateLink();
 

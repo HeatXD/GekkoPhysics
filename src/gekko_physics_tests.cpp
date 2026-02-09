@@ -3,10 +3,13 @@
 
 #include <chrono>
 #include <sstream>
+#include <vector>
+#include <cmath>
 
 #include "gekko_math.h"
 #include "gekko_ds.h"
 #include "gekko_physics.h"
+#include "gekko_debug_draw.h"
 
 using namespace GekkoMath;
 using namespace GekkoDS;
@@ -1516,5 +1519,333 @@ TEST_SUITE("Integration") {
 
         CHECK(stream1.size() == stream2.size());
         CHECK(std::memcmp(stream1.data(), stream2.data(), stream1.size()) == 0);
+    }
+}
+
+// ============================================================================
+// Debug Draw tests
+// ============================================================================
+
+struct DrawCall {
+    enum Type : uint8_t { SPHERE, BOX, CAPSULE, AABB_T, LINE, POINT } type;
+    Vec3F pos, pos2, half_ext;
+    Mat3F rot;
+    float radius;
+    float size;
+    Color color;
+
+    DrawCall() : type(SPHERE), pos(), pos2(), half_ext(), rot(), radius(0), size(0), color(0,0,0,0) {}
+};
+
+class MockDebugDraw : public DebugDraw {
+public:
+    std::vector<DrawCall> calls;
+
+    void DrawSphere(const Vec3F& center, float radius, const Color& color) override {
+        DrawCall c;
+        c.type = DrawCall::SPHERE;
+        c.pos = center;
+        c.radius = radius;
+        c.color = color;
+        calls.push_back(c);
+    }
+
+    void DrawBox(const Vec3F& center, const Vec3F& half_extents, const Mat3F& rotation, const Color& color) override {
+        DrawCall c;
+        c.type = DrawCall::BOX;
+        c.pos = center;
+        c.half_ext = half_extents;
+        c.rot = rotation;
+        c.color = color;
+        calls.push_back(c);
+    }
+
+    void DrawCapsule(const Vec3F& start, const Vec3F& end, float radius, const Color& color) override {
+        DrawCall c;
+        c.type = DrawCall::CAPSULE;
+        c.pos = start;
+        c.pos2 = end;
+        c.radius = radius;
+        c.color = color;
+        calls.push_back(c);
+    }
+
+    void DrawAABB(const Vec3F& min, const Vec3F& max, const Color& color) override {
+        DrawCall c;
+        c.type = DrawCall::AABB_T;
+        c.pos = min;
+        c.pos2 = max;
+        c.color = color;
+        calls.push_back(c);
+    }
+
+    void DrawLine(const Vec3F& from, const Vec3F& to, const Color& color) override {
+        DrawCall c;
+        c.type = DrawCall::LINE;
+        c.pos = from;
+        c.pos2 = to;
+        c.color = color;
+        calls.push_back(c);
+    }
+
+    void DrawPoint(const Vec3F& position, float size, const Color& color) override {
+        DrawCall c;
+        c.type = DrawCall::POINT;
+        c.pos = position;
+        c.size = size;
+        c.color = color;
+        calls.push_back(c);
+    }
+
+    int CountByType(DrawCall::Type t) const {
+        int count = 0;
+        for (const auto& c : calls) {
+            if (c.type == t) count++;
+        }
+        return count;
+    }
+};
+
+// Helper: create a world with one sphere body and attach debug draw
+static void MakeSingleSphereWorld(World& world, MockDebugDraw& dd) {
+    auto b = world.CreateBody();
+    auto g = world.AddShapeGroup(b);
+    world.GetShapeGroup(g).layer = 1;
+    world.GetShapeGroup(g).mask = 1;
+    auto s = world.AddShape(g, Shape::Sphere);
+    world.GetSphere(world.GetShape(s).shape_type_id).radius = Unit{2};
+    world.SetDebugDraw(&dd);
+}
+
+TEST_SUITE("DebugDraw") {
+    TEST_CASE("DrawDebug with no debug draw set does not crash") {
+        World world;
+        world.CreateBody();
+        world.DrawDebug(); // should be a no-op
+    }
+
+    TEST_CASE("DrawDebug with empty world produces no calls") {
+        World world;
+        MockDebugDraw dd;
+        world.SetDebugDraw(&dd);
+        world.DrawDebug();
+        CHECK(dd.calls.size() == 0);
+    }
+
+    TEST_CASE("single sphere body produces one DrawSphere call") {
+        World world;
+        MockDebugDraw dd;
+        dd.flags = DrawFlag_Shapes;
+        MakeSingleSphereWorld(world, dd);
+        world.DrawDebug();
+        CHECK(dd.CountByType(DrawCall::SPHERE) == 1);
+    }
+
+    TEST_CASE("single OBB body produces one DrawBox call") {
+        World world;
+        MockDebugDraw dd;
+        dd.flags = DrawFlag_Shapes;
+        world.SetDebugDraw(&dd);
+
+        auto b = world.CreateBody();
+        auto g = world.AddShapeGroup(b);
+        world.GetShapeGroup(g).layer = 1;
+        world.GetShapeGroup(g).mask = 1;
+        auto s = world.AddShape(g, Shape::OBB);
+        world.GetOBB(world.GetShape(s).shape_type_id).half_extents = Vec3(Unit{1}, Unit{1}, Unit{1});
+
+        world.DrawDebug();
+        CHECK(dd.CountByType(DrawCall::BOX) == 1);
+    }
+
+    TEST_CASE("single capsule body produces one DrawCapsule call") {
+        World world;
+        MockDebugDraw dd;
+        dd.flags = DrawFlag_Shapes;
+        world.SetDebugDraw(&dd);
+
+        auto b = world.CreateBody();
+        auto g = world.AddShapeGroup(b);
+        world.GetShapeGroup(g).layer = 1;
+        world.GetShapeGroup(g).mask = 1;
+        auto s = world.AddShape(g, Shape::Capsule);
+        auto& cap = world.GetCapsule(world.GetShape(s).shape_type_id);
+        cap.start = Vec3(Unit{0}, Unit{-1}, Unit{0});
+        cap.end = Vec3(Unit{0}, Unit{1}, Unit{0});
+        cap.radius = Unit{1};
+
+        world.DrawDebug();
+        CHECK(dd.CountByType(DrawCall::CAPSULE) == 1);
+    }
+
+    TEST_CASE("body with multiple shapes produces correct draw calls") {
+        World world;
+        MockDebugDraw dd;
+        dd.flags = DrawFlag_Shapes;
+        world.SetDebugDraw(&dd);
+
+        auto b = world.CreateBody();
+        auto g = world.AddShapeGroup(b);
+        world.GetShapeGroup(g).layer = 1;
+        world.GetShapeGroup(g).mask = 1;
+
+        world.AddShape(g, Shape::Sphere);
+        world.AddShape(g, Shape::OBB);
+        world.AddShape(g, Shape::Capsule);
+
+        world.DrawDebug();
+        CHECK(dd.CountByType(DrawCall::SPHERE) == 1);
+        CHECK(dd.CountByType(DrawCall::BOX) == 1);
+        CHECK(dd.CountByType(DrawCall::CAPSULE) == 1);
+        CHECK(dd.calls.size() == 3);
+    }
+
+    TEST_CASE("flag filtering: shapes only") {
+        World world;
+        MockDebugDraw dd;
+        dd.flags = DrawFlag_Shapes;
+        MakeSingleSphereWorld(world, dd);
+        world.DrawDebug();
+        CHECK(dd.CountByType(DrawCall::SPHERE) == 1);
+        CHECK(dd.CountByType(DrawCall::AABB_T) == 0);
+        CHECK(dd.CountByType(DrawCall::LINE) == 0);
+        CHECK(dd.CountByType(DrawCall::POINT) == 0);
+    }
+
+    TEST_CASE("flag filtering: AABBs only") {
+        World world;
+        MockDebugDraw dd;
+        dd.flags = DrawFlag_AABBs;
+        MakeSingleSphereWorld(world, dd);
+        world.DrawDebug();
+        CHECK(dd.CountByType(DrawCall::AABB_T) == 1);
+        CHECK(dd.CountByType(DrawCall::SPHERE) == 0);
+        CHECK(dd.CountByType(DrawCall::LINE) == 0);
+    }
+
+    TEST_CASE("flag filtering: body axes only") {
+        World world;
+        MockDebugDraw dd;
+        dd.flags = DrawFlag_BodyAxes;
+        MakeSingleSphereWorld(world, dd);
+        world.DrawDebug();
+        CHECK(dd.CountByType(DrawCall::LINE) == 3);
+        CHECK(dd.CountByType(DrawCall::SPHERE) == 0);
+        CHECK(dd.CountByType(DrawCall::AABB_T) == 0);
+    }
+
+    TEST_CASE("flag filtering: contacts only") {
+        World world;
+        MockDebugDraw dd;
+        dd.flags = DrawFlag_Contacts;
+        world.SetDebugDraw(&dd);
+
+        // Create two overlapping spheres to produce a contact
+        auto b1 = world.CreateBody();
+        auto b2 = world.CreateBody();
+        world.GetBody(b2).position = Vec3(Unit{3}, Unit{0}, Unit{0});
+
+        auto g1 = world.AddShapeGroup(b1);
+        auto g2 = world.AddShapeGroup(b2);
+        world.GetShapeGroup(g1).layer = 1; world.GetShapeGroup(g1).mask = 1;
+        world.GetShapeGroup(g2).layer = 1; world.GetShapeGroup(g2).mask = 1;
+
+        auto s1 = world.AddShape(g1, Shape::Sphere);
+        auto s2 = world.AddShape(g2, Shape::Sphere);
+        world.GetSphere(world.GetShape(s1).shape_type_id).radius = Unit{2};
+        world.GetSphere(world.GetShape(s2).shape_type_id).radius = Unit{2};
+
+        world.Update();
+        REQUIRE(world.GetContacts().size() == 1);
+
+        world.DrawDebug();
+        CHECK(dd.CountByType(DrawCall::POINT) == 1);
+        CHECK(dd.CountByType(DrawCall::LINE) == 1);
+        CHECK(dd.CountByType(DrawCall::SPHERE) == 0);
+        CHECK(dd.CountByType(DrawCall::AABB_T) == 0);
+    }
+
+    TEST_CASE("flag filtering: none produces no calls") {
+        World world;
+        MockDebugDraw dd;
+        dd.flags = 0;
+        MakeSingleSphereWorld(world, dd);
+        world.Update();
+        world.DrawDebug();
+        CHECK(dd.calls.size() == 0);
+    }
+
+    TEST_CASE("contact produces DrawPoint and DrawLine") {
+        World world;
+        MockDebugDraw dd;
+        dd.flags = DrawFlag_Contacts;
+        world.SetDebugDraw(&dd);
+
+        auto b1 = world.CreateBody();
+        auto b2 = world.CreateBody();
+        world.GetBody(b2).position = Vec3(Unit{3}, Unit{0}, Unit{0});
+
+        auto g1 = world.AddShapeGroup(b1);
+        auto g2 = world.AddShapeGroup(b2);
+        world.GetShapeGroup(g1).layer = 1; world.GetShapeGroup(g1).mask = 1;
+        world.GetShapeGroup(g2).layer = 1; world.GetShapeGroup(g2).mask = 1;
+
+        auto s1 = world.AddShape(g1, Shape::Sphere);
+        auto s2 = world.AddShape(g2, Shape::Sphere);
+        world.GetSphere(world.GetShape(s1).shape_type_id).radius = Unit{2};
+        world.GetSphere(world.GetShape(s2).shape_type_id).radius = Unit{2};
+
+        world.Update();
+        REQUIRE(world.GetContacts().size() == 1);
+
+        world.DrawDebug();
+        // 1 point + 1 line per contact
+        CHECK(dd.CountByType(DrawCall::POINT) == 1);
+        CHECK(dd.CountByType(DrawCall::LINE) == 1);
+
+        // midpoint should be at (1.5, 0, 0)
+        auto& pt = dd.calls[0];
+        CHECK(std::abs(pt.pos.x - 1.5f) < 0.01f);
+        CHECK(std::abs(pt.pos.y) < 0.01f);
+    }
+
+    TEST_CASE("body axes produce 3 DrawLine calls per body") {
+        World world;
+        MockDebugDraw dd;
+        dd.flags = DrawFlag_BodyAxes;
+        world.SetDebugDraw(&dd);
+
+        world.CreateBody();
+        world.CreateBody();
+
+        world.DrawDebug();
+        CHECK(dd.CountByType(DrawCall::LINE) == 6); // 3 per body * 2 bodies
+    }
+
+    TEST_CASE("world-space transform applied to drawn shapes") {
+        World world;
+        MockDebugDraw dd;
+        dd.flags = DrawFlag_Shapes;
+        world.SetDebugDraw(&dd);
+
+        auto b = world.CreateBody();
+        world.GetBody(b).position = Vec3(Unit{10}, Unit{5}, Unit{3});
+
+        auto g = world.AddShapeGroup(b);
+        world.GetShapeGroup(g).layer = 1;
+        world.GetShapeGroup(g).mask = 1;
+        auto s = world.AddShape(g, Shape::Sphere);
+        world.GetSphere(world.GetShape(s).shape_type_id).radius = Unit{1};
+        // sphere local center at (1, 0, 0)
+        world.GetSphere(world.GetShape(s).shape_type_id).center = Vec3(Unit{1}, Unit{0}, Unit{0});
+
+        world.DrawDebug();
+        REQUIRE(dd.CountByType(DrawCall::SPHERE) == 1);
+
+        // world center should be body.position + local.center = (11, 5, 3)
+        auto& call = dd.calls[0];
+        CHECK(std::abs(call.pos.x - 11.0f) < 0.01f);
+        CHECK(std::abs(call.pos.y - 5.0f) < 0.01f);
+        CHECK(std::abs(call.pos.z - 3.0f) < 0.01f);
     }
 }
