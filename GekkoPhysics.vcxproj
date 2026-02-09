@@ -146,6 +146,7 @@
     <ClInclude Include="include\gekko_shapes.h" />
     <ClInclude Include="include\gekko_physics.h" />
     <ClInclude Include="include\algo.h" />
+    <ClInclude Include="include\gekko_debug_draw.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="include\fpm\LICENSE.txt" />

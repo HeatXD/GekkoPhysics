@@ -4,3 +4,4 @@
 #define CHECK(__VA_ARGS__) DOCTEST_CHECK(__VA_ARGS__)
 #define TEST_CASE(name) DOCTEST_TEST_CASE(name)
 #define TEST_SUITE(decorators) DOCTEST_TEST_SUITE(decorators)
+#define MESSAGE(__VA_ARGS__) DOCTEST_MESSAGE(__VA_ARGS__)

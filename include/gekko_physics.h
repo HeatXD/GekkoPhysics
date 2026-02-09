@@ -70,6 +70,15 @@ namespace GekkoPhysics {
 		Vec3 _origin, _up;
 		Unit _update_rate { 60 };
 
+		struct GroupAABB {
+			Identifier group_id = INVALID_ID;
+			AABB aabb;
+		};
+
+		Vec<GroupAABB> _group_aabbs;
+
+		DebugDraw* _debug_draw = nullptr;
+
 	public:
 		void SetOrientation(const Vec3& up);
 		void SetOrigin(const Vec3& origin);
@@ -106,7 +115,6 @@ namespace GekkoPhysics {
 		void DrawDebug() const;
 
 	private:
-		DebugDraw* _debug_draw = nullptr;
 		// Create a link between entites.
 		Identifier CreateLink();
 

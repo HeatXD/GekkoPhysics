@@ -484,29 +484,23 @@ namespace GekkoPhysics {
 
 	void World::CheckCollisions() {
 		_contacts.clear();
+		_group_aabbs.clear();
 
 		const uint32_t count = _shape_groups.active_size();
 
-		// compute AABBs for all active shape groups
-		struct GroupAABB {
-			Identifier group_id = INVALID_ID;
-			AABB aabb;
-		};
-
-		Vec<GroupAABB> group_aabbs;
 		for (uint32_t i = 0; i < count; i++) {
 			Identifier gid = _shape_groups.entity_id(i);
 			const ShapeGroup& g = _shape_groups.get(gid);
 			GroupAABB ga;
 			ga.group_id = gid;
 			ga.aabb = ComputeShapeGroupAABB(g, _bodies.get(g.owner_body));
-			group_aabbs.push_back(ga);
+			_group_aabbs.push_back(ga);
 		}
 
-		for (uint32_t i = 0; i < group_aabbs.size(); i++) {
-			const ShapeGroup& a = _shape_groups.get(group_aabbs[i].group_id);
-			for (uint32_t j = i + 1; j < group_aabbs.size(); j++) {
-				const ShapeGroup& b = _shape_groups.get(group_aabbs[j].group_id);
+		for (uint32_t i = 0; i < _group_aabbs.size(); i++) {
+			const ShapeGroup& a = _shape_groups.get(_group_aabbs[i].group_id);
+			for (uint32_t j = i + 1; j < _group_aabbs.size(); j++) {
+				const ShapeGroup& b = _shape_groups.get(_group_aabbs[j].group_id);
 
 				// same-body collisions are not supported.
 				if (a.owner_body == b.owner_body) continue;
@@ -515,7 +509,7 @@ namespace GekkoPhysics {
 				// skip static-vs-static
 				if (_bodies.get(a.owner_body).is_static && _bodies.get(b.owner_body).is_static) continue;
 				// broadphase AABB overlap check
-				if (!Algo::OverlapAABB(group_aabbs[i].aabb, group_aabbs[j].aabb)) continue;
+				if (!Algo::OverlapAABB(_group_aabbs[i].aabb, _group_aabbs[j].aabb)) continue;
 
 				// narrowphase: iterate shape pairs
 				if (a.link_shapes == INVALID_ID || b.link_shapes == INVALID_ID) continue;
