@@ -276,14 +276,12 @@ namespace GekkoPhysics {
 
 		const uint32_t flags = _debug_draw->flags;
 
-		// Colors
-		const Color green(0.0f, 1.0f, 0.0f);
-		const Color yellow(1.0f, 1.0f, 0.0f);
-		const Color red(1.0f, 0.0f, 0.0f);
-		const Color orange(1.0f, 0.5f, 0.0f);
-		const Color axis_r(1.0f, 0.0f, 0.0f);
-		const Color axis_g(0.0f, 1.0f, 0.0f);
-		const Color axis_b(0.0f, 0.0f, 1.0f);
+		// AABBs
+		if (flags & DrawFlag_AABBs) {
+			for (const auto& ga : _group_aabbs) {
+				_debug_draw->DrawAABB(ga.aabb.min.AsFloat(), ga.aabb.max.AsFloat());
+			}
+		}
 
 		// Iterate bodies
 		const uint32_t body_count = _bodies.active_size();
@@ -291,13 +289,14 @@ namespace GekkoPhysics {
 			Identifier body_id = _bodies.entity_id(body_idx);
 			const Body& body = _bodies.get(body_id);
 
+			// Body origins
+			if (flags & DrawFlag_BodyOrigins) {
+				_debug_draw->DrawBodyOrigin(body.position.AsFloat());
+			}
+
 			// Body axes
 			if (flags & DrawFlag_BodyAxes) {
-				Vec3F pos = body.position.AsFloat();
-				Mat3F rot = body.rotation.AsFloat();
-				_debug_draw->DrawLine(pos, Vec3F(pos.x + rot.cols[0].x, pos.y + rot.cols[0].y, pos.z + rot.cols[0].z), axis_r);
-				_debug_draw->DrawLine(pos, Vec3F(pos.x + rot.cols[1].x, pos.y + rot.cols[1].y, pos.z + rot.cols[1].z), axis_g);
-				_debug_draw->DrawLine(pos, Vec3F(pos.x + rot.cols[2].x, pos.y + rot.cols[2].y, pos.z + rot.cols[2].z), axis_b);
+				_debug_draw->DrawBodyAxes(body.position.AsFloat(), body.rotation.AsFloat());
 			}
 
 			// Iterate shape groups
@@ -308,12 +307,6 @@ namespace GekkoPhysics {
 				Identifier group_id = group_link.children[group_idx];
 				if (group_id == INVALID_ID || !_shape_groups.contains(group_id)) continue;
 				const ShapeGroup& group = _shape_groups.get(group_id);
-
-				// AABB
-				if (flags & DrawFlag_AABBs) {
-					AABB aabb = ComputeShapeGroupAABB(group, body);
-					_debug_draw->DrawAABB(aabb.min.AsFloat(), aabb.max.AsFloat(), yellow);
-				}
 
 				// Shapes
 				if (flags & DrawFlag_Shapes) {
@@ -328,15 +321,15 @@ namespace GekkoPhysics {
 						switch (shape.type) {
 						case Shape::Sphere: {
 							Sphere world_sphere = WorldSphere(_spheres.get(shape.shape_type_id), body);
-							_debug_draw->DrawSphere(world_sphere.center.AsFloat(), static_cast<float>(world_sphere.radius), green);
+							_debug_draw->DrawSphere(world_sphere.center.AsFloat(), static_cast<float>(world_sphere.radius));
 						} break;
 						case Shape::OBB: {
 							OBB world_obb = WorldOBB(_obbs.get(shape.shape_type_id), body);
-							_debug_draw->DrawBox(world_obb.center.AsFloat(), world_obb.half_extents.AsFloat(), world_obb.rotation.AsFloat(), green);
+							_debug_draw->DrawBox(world_obb.center.AsFloat(), world_obb.half_extents.AsFloat(), world_obb.rotation.AsFloat());
 						} break;
 						case Shape::Capsule: {
 							Capsule world_capsule = WorldCapsule(_capsules.get(shape.shape_type_id), body);
-							_debug_draw->DrawCapsule(world_capsule.start.AsFloat(), world_capsule.end.AsFloat(), static_cast<float>(world_capsule.radius), green);
+							_debug_draw->DrawCapsule(world_capsule.start.AsFloat(), world_capsule.end.AsFloat(), static_cast<float>(world_capsule.radius));
 						} break;
 						default: break;
 						}
@@ -349,19 +342,11 @@ namespace GekkoPhysics {
 		if (flags & DrawFlag_Contacts) {
 			for (uint32_t contact_idx = 0; contact_idx < _contacts.size(); contact_idx++) {
 				const ContactPair& contact = _contacts[contact_idx];
-				const Body& body_a = _bodies.get(contact.body_a);
-				const Body& body_b = _bodies.get(contact.body_b);
-				Vec3F pos_a = body_a.position.AsFloat();
-				Vec3F pos_b = body_b.position.AsFloat();
-				Vec3F mid(
-					(pos_a.x + pos_b.x) * 0.5f,
-					(pos_a.y + pos_b.y) * 0.5f,
-					(pos_a.z + pos_b.z) * 0.5f
-				);
-				_debug_draw->DrawPoint(mid, 5.0f, red);
+				Vec3F point = contact.point.AsFloat();
+				_debug_draw->DrawPoint(point, 5.0f);
 
 				Vec3F normal = contact.normal.AsFloat();
-				_debug_draw->DrawLine(mid, Vec3F(mid.x + normal.x, mid.y + normal.y, mid.z + normal.z), orange);
+				_debug_draw->DrawLine(point, Vec3F(point.x + normal.x, point.y + normal.y, point.z + normal.z));
 			}
 		}
 	}
@@ -548,6 +533,7 @@ namespace GekkoPhysics {
 					contact.shape_a = shape_a_id;
 					contact.shape_b = shape_b_id;
 					contact.normal = result.normal;
+					contact.point = result.point;
 					contact.depth = result.depth;
 					_contacts.push_back(contact);
 				}

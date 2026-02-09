@@ -91,8 +91,13 @@ namespace GekkoPhysics {
 		result.hit = true;
 		if (distance == Unit{0}) {
 			result.normal = Vec3(Unit{0}, Unit{1}, Unit{0});
+			result.point = a.center;
 		} else {
 			result.normal = normalize(between_centers);
+			// midpoint between the two surface points
+			Vec3 surface_a = a.center + result.normal * a.radius;
+			Vec3 surface_b = b.center - result.normal * b.radius;
+			result.point = (surface_a + surface_b) / Unit{2};
 		}
 		return result;
 	}
@@ -145,6 +150,8 @@ namespace GekkoPhysics {
 			Unit axis_sign = local_center.Dot(b.rotation.cols[min_axis]) < Unit{0} ? Unit{-1} : Unit{1};
 			result.normal = b.rotation.cols[min_axis] * (Unit{0} - axis_sign);
 			result.depth = min_penetration + a.radius;
+			// contact point on OBB surface along push-out direction
+			result.point = a.center - result.normal * min_penetration;
 			return result;
 		}
 
@@ -156,8 +163,12 @@ namespace GekkoPhysics {
 
 		if (distance == Unit{0}) {
 			result.normal = Vec3(Unit{0}, Unit{1}, Unit{0});
+			result.point = closest;
 		} else {
 			result.normal = normalize(sphere_to_closest);
+			// midpoint between sphere surface and closest point on OBB
+			Vec3 surface_a = a.center + result.normal * a.radius;
+			result.point = (surface_a + closest) / Unit{2};
 		}
 		return result;
 	}
@@ -236,6 +247,11 @@ namespace GekkoPhysics {
 		result.hit = true;
 		result.depth = min_overlap;
 		result.normal = min_overlap_axis;
+
+		// contact point: closest points between the two OBBs
+		Vec3 p1 = ClosestPointOnOBB(b.center, a);
+		Vec3 p2 = ClosestPointOnOBB(p1, b);
+		result.point = (p1 + p2) / Unit{2};
 		return result;
 	}
 

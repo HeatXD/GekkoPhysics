@@ -51,6 +51,7 @@ namespace GekkoPhysics {
 		Identifier shape_a = INVALID_ID;
 		Identifier shape_b = INVALID_ID;
 		Vec3 normal;
+		Vec3 point;
 		Unit depth;
 	};
 

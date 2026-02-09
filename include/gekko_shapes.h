@@ -29,6 +29,7 @@ namespace GekkoPhysics {
 	struct CollisionResult {
 		bool hit = false;
 		Vec3 normal;
+		Vec3 point;
 		Unit depth;
 	};
 }

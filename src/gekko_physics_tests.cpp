@@ -1527,73 +1527,81 @@ TEST_SUITE("Integration") {
 // ============================================================================
 
 struct DrawCall {
-    enum Type : uint8_t { SPHERE, BOX, CAPSULE, AABB_T, LINE, POINT } type;
+    enum Type : uint8_t { SPHERE, BOX, CAPSULE, AABB_T, LINE, POINT, BODY_ORIGIN, BODY_AXES } type;
     Vec3F pos, pos2, half_ext;
     Mat3F rot;
     float radius;
     float size;
-    Color color;
 
-    DrawCall() : type(SPHERE), pos(), pos2(), half_ext(), rot(), radius(0), size(0), color(0,0,0,0) {}
+    DrawCall() : type(SPHERE), pos(), pos2(), half_ext(), rot(), radius(0), size(0) {}
 };
 
 class MockDebugDraw : public DebugDraw {
 public:
     std::vector<DrawCall> calls;
 
-    void DrawSphere(const Vec3F& center, float radius, const Color& color) override {
+    void DrawSphere(const Vec3F& center, float radius) override {
         DrawCall c;
         c.type = DrawCall::SPHERE;
         c.pos = center;
         c.radius = radius;
-        c.color = color;
         calls.push_back(c);
     }
 
-    void DrawBox(const Vec3F& center, const Vec3F& half_extents, const Mat3F& rotation, const Color& color) override {
+    void DrawBox(const Vec3F& center, const Vec3F& half_extents, const Mat3F& rotation) override {
         DrawCall c;
         c.type = DrawCall::BOX;
         c.pos = center;
         c.half_ext = half_extents;
         c.rot = rotation;
-        c.color = color;
         calls.push_back(c);
     }
 
-    void DrawCapsule(const Vec3F& start, const Vec3F& end, float radius, const Color& color) override {
+    void DrawCapsule(const Vec3F& start, const Vec3F& end, float radius) override {
         DrawCall c;
         c.type = DrawCall::CAPSULE;
         c.pos = start;
         c.pos2 = end;
         c.radius = radius;
-        c.color = color;
         calls.push_back(c);
     }
 
-    void DrawAABB(const Vec3F& min, const Vec3F& max, const Color& color) override {
+    void DrawAABB(const Vec3F& min, const Vec3F& max) override {
         DrawCall c;
         c.type = DrawCall::AABB_T;
         c.pos = min;
         c.pos2 = max;
-        c.color = color;
         calls.push_back(c);
     }
 
-    void DrawLine(const Vec3F& from, const Vec3F& to, const Color& color) override {
+    void DrawLine(const Vec3F& from, const Vec3F& to) override {
         DrawCall c;
         c.type = DrawCall::LINE;
         c.pos = from;
         c.pos2 = to;
-        c.color = color;
         calls.push_back(c);
     }
 
-    void DrawPoint(const Vec3F& position, float size, const Color& color) override {
+    void DrawPoint(const Vec3F& position, float size) override {
         DrawCall c;
         c.type = DrawCall::POINT;
         c.pos = position;
         c.size = size;
-        c.color = color;
+        calls.push_back(c);
+    }
+
+    void DrawBodyOrigin(const Vec3F& position) override {
+        DrawCall c;
+        c.type = DrawCall::BODY_ORIGIN;
+        c.pos = position;
+        calls.push_back(c);
+    }
+
+    void DrawBodyAxes(const Vec3F& position, const Mat3F& rotation) override {
+        DrawCall c;
+        c.type = DrawCall::BODY_AXES;
+        c.pos = position;
+        c.rot = rotation;
         calls.push_back(c);
     }
 
@@ -1717,6 +1725,7 @@ TEST_SUITE("DebugDraw") {
         MockDebugDraw dd;
         dd.flags = DrawFlag_AABBs;
         MakeSingleSphereWorld(world, dd);
+        world.Update();
         world.DrawDebug();
         CHECK(dd.CountByType(DrawCall::AABB_T) == 1);
         CHECK(dd.CountByType(DrawCall::SPHERE) == 0);
@@ -1729,7 +1738,7 @@ TEST_SUITE("DebugDraw") {
         dd.flags = DrawFlag_BodyAxes;
         MakeSingleSphereWorld(world, dd);
         world.DrawDebug();
-        CHECK(dd.CountByType(DrawCall::LINE) == 3);
+        CHECK(dd.CountByType(DrawCall::BODY_AXES) == 1);
         CHECK(dd.CountByType(DrawCall::SPHERE) == 0);
         CHECK(dd.CountByType(DrawCall::AABB_T) == 0);
     }
@@ -1809,7 +1818,7 @@ TEST_SUITE("DebugDraw") {
         CHECK(std::abs(pt.pos.y) < 0.01f);
     }
 
-    TEST_CASE("body axes produce 3 DrawLine calls per body") {
+    TEST_CASE("body axes produce 1 DrawBodyAxes call per body") {
         World world;
         MockDebugDraw dd;
         dd.flags = DrawFlag_BodyAxes;
@@ -1819,7 +1828,7 @@ TEST_SUITE("DebugDraw") {
         world.CreateBody();
 
         world.DrawDebug();
-        CHECK(dd.CountByType(DrawCall::LINE) == 6); // 3 per body * 2 bodies
+        CHECK(dd.CountByType(DrawCall::BODY_AXES) == 2); // 1 per body * 2 bodies
     }
 
     TEST_CASE("world-space transform applied to drawn shapes") {
