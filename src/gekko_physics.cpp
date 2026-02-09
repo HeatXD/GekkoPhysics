@@ -353,14 +353,14 @@ namespace GekkoPhysics {
 
 	Sphere World::WorldSphere(const Sphere& local, const Body& body) const {
 		Sphere world;
-		world.center = body.position + body.rotation * local.center;
+		world.center = body.rotation.TransformPoint(local.center, body.position);
 		world.radius = local.radius;
 		return world;
 	}
 
 	OBB World::WorldOBB(const OBB& local, const Body& body) const {
 		OBB world;
-		world.center = body.position + body.rotation * local.center;
+		world.center = body.rotation.TransformPoint(local.center, body.position);
 		world.rotation = body.rotation * local.rotation;
 		world.half_extents = local.half_extents;
 		return world;
@@ -368,8 +368,8 @@ namespace GekkoPhysics {
 
 	Capsule World::WorldCapsule(const Capsule& local, const Body& body) const {
 		Capsule world;
-		world.start = body.position + body.rotation * local.start;
-		world.end = body.position + body.rotation * local.end;
+		world.start = body.rotation.TransformPoint(local.start, body.position);
+		world.end = body.rotation.TransformPoint(local.end, body.position);
 		world.radius = local.radius;
 		return world;
 	}

@@ -169,8 +169,8 @@ namespace GekkoMath {
         Vec3 Transform(const Vec3& v) const { return *this * v; }
 
         // Transform point from local to world: world = origin + rotation * local
-        Vec3 TransformPoint(const Vec3& local, const Vec3& origin, const Mat3& rotation) {
-            return origin + rotation.Transform(local);
+        Vec3 TransformPoint(const Vec3& local, const Vec3& origin) const {
+            return origin + Transform(local);
         }
 
         Mat3 operator*(const Mat3& o) const {
@@ -179,6 +179,11 @@ namespace GekkoMath {
                 *this * o.cols[1],
                 *this * o.cols[2]
             );
+        }
+
+        Mat3& operator*=(const Mat3& o) {
+            *this = *this * o;
+            return *this;
         }
 
         bool operator==(const Mat3& o) const {

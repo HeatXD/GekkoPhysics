@@ -142,8 +142,8 @@ static GekkoPhysics::Identifier BuildScene(GekkoPhysics::World& world) {
     // Controlled body: static sphere you move with arrow keys
     Identifier controlled_body;
     {
-        auto [b, g] = makeBody(Vec3(Unit{0}, Unit{1}, Unit{0}), true);
-        addSphereShape(g, zero, Unit{1});
+        auto [b, g] = makeBody(Vec3(Unit{0}, Unit{1}, Unit{0}), false);
+        addSphereShape(g, Vec3(Unit{-4}, Unit{0}, Unit{0}), Unit{1});
         controlled_body = b;
     }
 
@@ -226,6 +226,7 @@ int main() {
         // Arrow keys move the controlled body on XZ plane
         {
             auto& body = world.GetBody(controlled);
+            body.rotation *= GekkoMath::Mat3::RotateZ(1);
             if (IsKeyDown(KEY_RIGHT)) body.position.x += move_speed / GekkoMath::Unit{10};
             if (IsKeyDown(KEY_LEFT))  body.position.x -= move_speed / GekkoMath::Unit{10};
             if (IsKeyDown(KEY_UP))    body.position.z -= move_speed / GekkoMath::Unit{10};
