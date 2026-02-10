@@ -226,7 +226,7 @@ int main() {
         // Arrow keys move the controlled body on XZ plane
         {
             auto& body = world.GetBody(controlled);
-            body.rotation *= GekkoMath::Mat3::RotateZ(1);
+            body.rotation *= GekkoMath::Mat3::RotateZ(5);
             if (IsKeyDown(KEY_RIGHT)) body.position.x += move_speed / GekkoMath::Unit{10};
             if (IsKeyDown(KEY_LEFT))  body.position.x -= move_speed / GekkoMath::Unit{10};
             if (IsKeyDown(KEY_UP))    body.position.z -= move_speed / GekkoMath::Unit{10};

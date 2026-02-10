@@ -7,10 +7,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\gekko_physics_tests.cpp">
+    <ClCompile Include="src\gekko_physics_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\algo_tests.cpp">
+    <ClCompile Include="src\algo_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

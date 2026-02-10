@@ -53,12 +53,12 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="include\fpm\LICENSE.txt" />
-    <Text Include="LICENSE.txt" />
+    <Text Include="..\LICENSE.md" />
   </ItemGroup>
   <ItemGroup>
-    <None Include=".gitattributes" />
-    <None Include=".gitignore" />
-    <None Include="README.md" />
-    <None Include="cpp.hint" />
+    <None Include="..\.gitattributes" />
+    <None Include="..\.gitignore" />
+    <None Include="..\README.md" />
+    <None Include="..\cpp.hint" />
   </ItemGroup>
 </Project>

@@ -148,13 +148,13 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="include\fpm\LICENSE.txt" />
-    <Text Include="LICENSE.txt" />
+    <Text Include="..\LICENSE.md" />
   </ItemGroup>
   <ItemGroup>
-    <None Include=".gitattributes" />
-    <None Include=".gitignore" />
-    <None Include="cpp.hint" />
-    <None Include="README.md" />
+    <None Include="..\.gitattributes" />
+    <None Include="..\.gitignore" />
+    <None Include="..\cpp.hint" />
+    <None Include="..\README.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
