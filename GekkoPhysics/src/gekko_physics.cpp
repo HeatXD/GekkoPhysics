@@ -14,6 +14,10 @@ namespace GekkoPhysics {
 		_update_rate = rate;
 	}
 
+	void World::SetSolverIterations(uint8_t iterations) {
+		_solver_iterations = iterations;
+	}
+
 	Identifier World::CreateBody() {
 		return _bodies.insert({});
 	}
@@ -197,6 +201,7 @@ namespace GekkoPhysics {
 		stream.write_chunk(&_origin, sizeof(Vec3));
 		stream.write_chunk(&_up, sizeof(Vec3));
 		stream.write_chunk(&_update_rate, sizeof(Unit));
+		stream.write_chunk(&_solver_iterations, sizeof(uint8_t));
 	}
 
 	void World::Load(MemStream& stream) {
@@ -220,6 +225,9 @@ namespace GekkoPhysics {
 
 		chunk_data = stream.read_chunk(chunk_size);
 		std::memcpy(&_update_rate, chunk_data, chunk_size);
+
+		chunk_data = stream.read_chunk(chunk_size);
+		std::memcpy(&_solver_iterations, chunk_data, chunk_size);
 	}
 
 	void World::Update() {
@@ -231,6 +239,82 @@ namespace GekkoPhysics {
 		}
 
 		CheckCollisions();
+		ResolveCollisions();
+	}
+
+	void World::ResolveCollisions() {
+		const Unit zero{0};
+		const Unit two{2};
+		const Unit correction_factor = Unit{2} / Unit{5}; // 0.4
+		const Unit slop = Unit{1} / Unit{100}; // 0.01
+
+		// Precompute target separation for each contact so we can
+		// re-evaluate effective depth each iteration as positions change.
+		// target = (b.pos - a.pos).Dot(normal) + depth  (projection at zero-overlap)
+		Vec<Unit> targets;
+		for (uint32_t i = 0; i < _contacts.size(); i++) {
+			const ContactPair& contact = _contacts[i];
+			if (contact.is_trigger) {
+				targets.push_back(zero);
+				continue;
+			}
+			const Body& a = _bodies.get(contact.body_a);
+			const Body& b = _bodies.get(contact.body_b);
+			Unit proj = (b.position - a.position).Dot(contact.normal);
+			targets.push_back(proj + contact.depth);
+		}
+
+		// Position correction — multiple iterations for convergence
+		for (uint8_t iter = 0; iter < _solver_iterations; iter++) {
+			for (uint32_t i = 0; i < _contacts.size(); i++) {
+				const ContactPair& contact = _contacts[i];
+				if (contact.is_trigger) continue;
+
+				Body& a = _bodies.get(contact.body_a);
+				Body& b = _bodies.get(contact.body_b);
+
+				// Recompute effective depth from current positions
+				Unit current_proj = (b.position - a.position).Dot(contact.normal);
+				Unit effective_depth = targets[i] - current_proj;
+
+				Unit pen = effective_depth - slop;
+				if (pen <= zero) continue;
+				Unit correction = pen * correction_factor;
+
+				if (a.is_static) {
+					b.position += contact.normal * correction;
+				} else if (b.is_static) {
+					a.position -= contact.normal * correction;
+				} else {
+					Unit half_corr = correction / two;
+					a.position -= contact.normal * half_corr;
+					b.position += contact.normal * half_corr;
+				}
+			}
+		}
+
+		// Velocity correction — single pass after position settled
+		// Normal points from a toward b, so positive v_rel_n means approaching
+		for (uint32_t i = 0; i < _contacts.size(); i++) {
+			const ContactPair& contact = _contacts[i];
+			if (contact.is_trigger) continue;
+
+			Body& a = _bodies.get(contact.body_a);
+			Body& b = _bodies.get(contact.body_b);
+
+			Unit v_rel_n = (a.velocity - b.velocity).Dot(contact.normal);
+			if (v_rel_n <= zero) continue; // separating or still
+
+			if (a.is_static) {
+				b.velocity += contact.normal * v_rel_n;
+			} else if (b.is_static) {
+				a.velocity -= contact.normal * v_rel_n;
+			} else {
+				Unit half_v = v_rel_n / two;
+				a.velocity -= contact.normal * half_v;
+				b.velocity += contact.normal * half_v;
+			}
+		}
 	}
 
 	Identifier World::CreateLink() {
@@ -535,6 +619,7 @@ namespace GekkoPhysics {
 					contact.normal = result.normal;
 					contact.point = result.point;
 					contact.depth = result.depth;
+					contact.is_trigger = group_a.is_trigger || group_b.is_trigger;
 					_contacts.push_back(contact);
 				}
 			}

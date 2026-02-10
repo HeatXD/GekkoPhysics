@@ -21,10 +21,11 @@ namespace GekkoPhysics {
 		} type = None;
 	};
 
-	struct ShapeGroup { 
+	struct ShapeGroup {
 		Identifier owner_body = INVALID_ID;
 		Identifier link_shapes = INVALID_ID;
 		uint32_t layer = 0, mask = 0;
+		bool is_trigger = false;
 	};
 
 	struct Body {
@@ -53,6 +54,7 @@ namespace GekkoPhysics {
 		Vec3 normal;
 		Vec3 point;
 		Unit depth;
+		bool is_trigger = false;
 	};
 
 	class World {
@@ -70,6 +72,7 @@ namespace GekkoPhysics {
 
 		Vec3 _origin, _up;
 		Unit _update_rate { 60 };
+		uint8_t _solver_iterations = 4;
 
 		struct GroupAABB {
 			Identifier group_id = INVALID_ID;
@@ -81,11 +84,13 @@ namespace GekkoPhysics {
 		DebugDraw* _debug_draw = nullptr;
 
 	public:
+
 		void SetOrientation(const Vec3& up);
 		void SetOrigin(const Vec3& origin);
 
 		// Sets the expected number of iterations per second (default 60)
 		void SetUpdateRate(const Unit& rate);
+		void SetSolverIterations(uint8_t iterations);
 
 		Identifier CreateBody();
 		// Adds a shapegroup to a body.
@@ -125,6 +130,7 @@ namespace GekkoPhysics {
 		Capsule WorldCapsule(const Capsule& local, const Body& body) const;
 
 		void CheckCollisions();
+		void ResolveCollisions();
 		void BuildGroupAABBs();
 		bool BroadphaseFilter(const ShapeGroup& group_a, const ShapeGroup& group_b, const AABB& aabb_a, const AABB& aabb_b) const;
 		void NarrowphaseGroupPair(const ShapeGroup& group_a, const ShapeGroup& group_b);

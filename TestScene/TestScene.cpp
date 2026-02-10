@@ -3,24 +3,17 @@
 
 #include "gekko_physics.h"
 
-// ── Helpers ──────────────────────────────────────────────────────────
-
 static Vector3 ToRL(const GekkoMath::Vec3F& v) { return { v.x, v.y, v.z }; }
-
-
-
-// ── Raylib DebugDraw implementation ─────────────────────────────────
 
 class RaylibDebugDraw : public GekkoPhysics::DebugDraw {
     using Vec3F = GekkoMath::Vec3F;
     using Mat3F = GekkoMath::Mat3F;
 
-    // Renderer-chosen colors (high contrast on white)
     static constexpr ::Color COL_SHAPE      = { 30, 60, 180, 255 };    // strong blue
     static constexpr ::Color COL_SHAPE_FILL = { 30, 60, 180, 50 };
     static constexpr ::Color COL_AABB       = { 0, 160, 0, 255 };      // green
     static constexpr ::Color COL_CONTACT    = { 220, 0, 0, 255 };      // red
-    static constexpr ::Color COL_NORMAL     = { 220, 0, 0, 255 };      // red (same as contact)
+    static constexpr ::Color COL_NORMAL     = { 200, 0, 0, 255 };      // red (same as contact)
     static constexpr ::Color COL_LINE       = { 40, 40, 40, 255 };     // near-black
 
 public:
@@ -93,11 +86,12 @@ public:
     }
 };
 
-// ── Scene setup ─────────────────────────────────────────────────────
 
 static GekkoPhysics::Identifier BuildScene(GekkoPhysics::World& world) {
     using namespace GekkoPhysics;
     using namespace GekkoMath;
+
+    Vec3 gravity(Unit{0}, Unit{-10}, Unit{0});
 
     // Helper: create body + shape group
     auto makeBody = [&](Vec3 pos, bool is_static, Mat3 rot = Mat3()) {
@@ -106,6 +100,7 @@ static GekkoPhysics::Identifier BuildScene(GekkoPhysics::World& world) {
         b.position = pos;
         b.is_static = is_static;
         b.rotation = rot;
+        if (!is_static) b.acceleration = gravity;
         Identifier gid = world.AddShapeGroup(bid);
         ShapeGroup& sg = world.GetShapeGroup(gid);
         sg.layer = 1; sg.mask = 0xFFFFFFFF;
@@ -136,63 +131,57 @@ static GekkoPhysics::Identifier BuildScene(GekkoPhysics::World& world) {
     };
 
     Vec3 zero;
-    Vec3 up(Unit{0}, Unit{1}, Unit{0});
-    Vec3 down(Unit{0}, Unit{-1}, Unit{0});
 
-    // Controlled body: static sphere you move with arrow keys
+    // Floor: top surface at y=0, extends 20 units in XZ
+    {
+        auto [b, g] = makeBody(Vec3(Unit{0}, Unit{-1}, Unit{0}), true);
+        addOBBShape(g, zero, Vec3(Unit{20}, Unit{1}, Unit{20}));
+    }
+
+    // Wall 1 (back wall): along X axis at z=-10, 4 units tall
+    {
+        auto [b, g] = makeBody(Vec3(Unit{0}, Unit{2}, Unit{-11}), true);
+        addOBBShape(g, zero, Vec3(Unit{20}, Unit{4}, Unit{5}));
+    }
+
+    // Wall 2 (left wall): along Z axis at x=-10, 4 units tall — forms corner with wall 1
+    {
+        auto [b, g] = makeBody(Vec3(Unit{-11}, Unit{2}, Unit{0}), true);
+        addOBBShape(g, zero, Vec3(Unit{1}, Unit{4}, Unit{20}));
+    }
+
     Identifier controlled_body;
     {
-        auto [b, g] = makeBody(Vec3(Unit{0}, Unit{1}, Unit{0}), false);
-        addSphereShape(g, Vec3(Unit{-4}, Unit{0}, Unit{0}), Unit{1});
+        auto [b, g] = makeBody(Vec3(Unit{0}, Unit{2}, Unit{0}), false);
+        addSphereShape(g, zero, Unit{1});
         controlled_body = b;
     }
 
-    // Dynamic single-shape targets
     {
-        auto [b, g] = makeBody(Vec3(Unit{-8}, Unit{1}, Unit{0}), false);
+        auto [b, g] = makeBody(Vec3(Unit{-5}, Unit{2}, Unit{0}), false);
         addSphereShape(g, zero, Unit{1});
     }
     {
         // Tall box
-        auto [b, g] = makeBody(Vec3(Unit{8}, Unit{2}, Unit{0}), false);
+        auto [b, g] = makeBody(Vec3(Unit{5}, Unit{3}, Unit{0}), false);
         addOBBShape(g, zero, Vec3(Unit{1}, Unit{2}, Unit{1}));
     }
     {
         // Diagonal capsule
-        auto [b, g] = makeBody(Vec3(Unit{0}, Unit{1}, Unit{-8}), false);
+        auto [b, g] = makeBody(Vec3(Unit{0}, Unit{2}, Unit{-5}), false);
         addCapsuleShape(g, Vec3(Unit{-1}, Unit{-1}, Unit{0}), Vec3(Unit{1}, Unit{1}, Unit{0}), Unit{1} / Unit{2});
     }
     {
-        // Rotated wide box
-        auto [b, g] = makeBody(Vec3(Unit{0}, Unit{1}, Unit{8}), false, Mat3::RotateY(45));
+        // Rotated wide box near corner
+        auto [b, g] = makeBody(Vec3(Unit{-7}, Unit{2}, Unit{-7}), false, Mat3::RotateY(45));
         addOBBShape(g, zero, Vec3(Unit{2}, Unit{1}, Unit{1}));
-    }
-
-    // Dynamic multi-shape bodies
-    {
-        // Sphere + tall OBB side by side
-        auto [b, g] = makeBody(Vec3(Unit{-6}, Unit{1}, Unit{-6}), false);
-        addSphereShape(g, Vec3(Unit{-1}, Unit{0}, Unit{0}), Unit{1});
-        addOBBShape(g, Vec3(Unit{2}, Unit{0}, Unit{0}), Vec3(Unit{1}, Unit{2}, Unit{1}));
-    }
-    {
-        // Tilted capsule + sphere
-        auto [b, g] = makeBody(Vec3(Unit{6}, Unit{1}, Unit{-6}), false);
-        addCapsuleShape(g, Vec3(Unit{0}, Unit{-1}, Unit{-1}), Vec3(Unit{0}, Unit{1}, Unit{1}), Unit{1} / Unit{2});
-        addSphereShape(g, Vec3(Unit{2}, Unit{0}, Unit{0}), Unit{1});
     }
     {
         // Three spheres in a line
-        auto [b, g] = makeBody(Vec3(Unit{-6}, Unit{1}, Unit{6}), false);
+        auto [b, g] = makeBody(Vec3(Unit{5}, Unit{2}, Unit{5}), false);
         addSphereShape(g, Vec3(Unit{-2}, Unit{0}, Unit{0}), Unit{1});
         addSphereShape(g, Vec3(Unit{0}, Unit{0}, Unit{0}), Unit{1});
         addSphereShape(g, Vec3(Unit{2}, Unit{0}, Unit{0}), Unit{1});
-    }
-    {
-        // Tall OBB + angled capsule
-        auto [b, g] = makeBody(Vec3(Unit{6}, Unit{1}, Unit{6}), false);
-        addOBBShape(g, Vec3(Unit{0}, Unit{0}, Unit{-1}), Vec3(Unit{1}, Unit{3}, Unit{1}));
-        addCapsuleShape(g, Vec3(Unit{-1}, Unit{0}, Unit{1}), Vec3(Unit{1}, Unit{1}, Unit{2}), Unit{1} / Unit{2});
     }
 
     return controlled_body;
@@ -217,20 +206,26 @@ int main() {
     debug_draw.flags = GekkoPhysics::DrawFlag_All;
     world.SetDebugDraw(&debug_draw);
 
-    const GekkoMath::Unit move_speed{1};
+    const GekkoMath::Unit move_speed{5};
+    const GekkoMath::Unit jump_speed{8};
     SetTargetFPS(60);
 
     while (!window.ShouldClose()) {
-        UpdateCamera(&camera, CAMERA_FIRST_PERSON);
-
-        // Arrow keys move the controlled body on XZ plane
+        // Arrow keys set horizontal velocity, space to jump
         {
             auto& body = world.GetBody(controlled);
-            body.rotation *= GekkoMath::Mat3::RotateZ(5);
-            if (IsKeyDown(KEY_RIGHT)) body.position.x += move_speed / GekkoMath::Unit{10};
-            if (IsKeyDown(KEY_LEFT))  body.position.x -= move_speed / GekkoMath::Unit{10};
-            if (IsKeyDown(KEY_UP))    body.position.z -= move_speed / GekkoMath::Unit{10};
-            if (IsKeyDown(KEY_DOWN))  body.position.z += move_speed / GekkoMath::Unit{10};
+            GekkoMath::Unit vx{0}, vz{0};
+            if (IsKeyDown(KEY_RIGHT)) vx += move_speed;
+            if (IsKeyDown(KEY_LEFT))  vx -= move_speed;
+            if (IsKeyDown(KEY_UP))    vz -= move_speed;
+            if (IsKeyDown(KEY_DOWN))  vz += move_speed;
+            body.velocity.x = vx;
+            body.velocity.z = vz;
+
+            // Jump: only when on or near the floor (y near 1 = sphere radius above floor)
+            if (IsKeyPressed(KEY_SPACE) && body.position.y < GekkoMath::Unit{2}) {
+                body.velocity.y = jump_speed;
+            }
         }
 
         world.Update();
@@ -239,7 +234,6 @@ int main() {
         ClearBackground(RAYWHITE);
 
         BeginMode3D(camera);
-        DrawGrid(20, 1.0f);
 
         // Pass 1: shapes + AABBs (with depth testing)
         debug_draw.flags = GekkoPhysics::DrawFlag_Shapes | GekkoPhysics::DrawFlag_AABBs;
@@ -255,14 +249,18 @@ int main() {
 
         EndMode3D();
 
-        DrawText("GekkoPhysics - Sphere | OBB | Capsule", 10, 10, 20, DARKGRAY);
+        DrawText("GekkoPhysics - Arrow keys: move | Space: jump", 10, 10, 20, DARKGRAY);
         DrawText(TextFormat("Contacts: %d", (int)world.GetContacts().size()), 10, 35, 20, RED);
+        {
+            auto pos = world.GetBody(controlled).position.AsFloat();
+            DrawText(TextFormat("Pos: (%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z), 10, 60, 20, DARKGRAY);
+        }
         auto& contacts = world.GetContacts();
         for (int i = 0; i < (int)contacts.size() && i < 4; i++) {
             auto p = contacts[i].point.AsFloat();
-            DrawText(TextFormat("  C%d: (%.2f, %.2f, %.2f)", i, p.x, p.y, p.z), 10, 60 + i * 25, 20, RED);
+            DrawText(TextFormat("  C%d: (%.2f, %.2f, %.2f)", i, p.x, p.y, p.z), 10, 85 + i * 25, 20, RED);
         }
-        DrawFPS(1920 - 100, 10);
+        DrawFPS(1500, 10);
 
         EndDrawing();
     }

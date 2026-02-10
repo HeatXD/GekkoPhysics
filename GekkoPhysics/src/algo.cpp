@@ -174,16 +174,27 @@ namespace GekkoPhysics {
 	}
 
 	CollisionResult Algo::CollideCapsuleOBB(const Capsule& a, const OBB& b) {
+		Sphere sphere;
+		sphere.radius = a.radius;
+
+		// Test both endpoints — catches contacts when OBB center is far from segment
+		sphere.center = a.start;
+		CollisionResult best = CollideSphereOBB(sphere, b);
+
+		sphere.center = a.end;
+		CollisionResult r2 = CollideSphereOBB(sphere, b);
+		if (r2.hit && (!best.hit || r2.depth > best.depth)) best = r2;
+
+		// Also test the heuristic midpoint for oblique/middle contacts
 		Vec3 closest_on_seg = ClosestPointOnSegment(b.center, a.start, a.end);
 		Vec3 closest_on_obb = ClosestPointOnOBB(closest_on_seg, b);
-
-		// refine: find closest point on segment to that OBB point
 		closest_on_seg = ClosestPointOnSegment(closest_on_obb, a.start, a.end);
 
-		Sphere sphere;
 		sphere.center = closest_on_seg;
-		sphere.radius = a.radius;
-		return CollideSphereOBB(sphere, b);
+		CollisionResult r3 = CollideSphereOBB(sphere, b);
+		if (r3.hit && (!best.hit || r3.depth > best.depth)) best = r3;
+
+		return best;
 	}
 
 	CollisionResult Algo::CollideOBBs(const OBB& a, const OBB& b) {

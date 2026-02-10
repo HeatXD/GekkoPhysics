@@ -1425,8 +1425,6 @@ TEST_SUITE("Integration") {
         auto load_start = std::chrono::high_resolution_clock::now();
         world2.Load(stream);
         auto load_end = std::chrono::high_resolution_clock::now();
-        world2.Update();
-        uint32_t contacts_after = world2.GetContacts().size();
 
         auto save_us = std::chrono::duration_cast<std::chrono::microseconds>(save_end - save_start).count();
         auto load_us = std::chrono::duration_cast<std::chrono::microseconds>(load_end - load_start).count();
@@ -1435,17 +1433,18 @@ TEST_SUITE("Integration") {
         log << "save_bytes=" << save_size
             << " save_us=" << save_us
             << " load_us=" << load_us
-            << " contacts_before=" << contacts_before
-            << " contacts_after=" << contacts_after;
+            << " contacts_before=" << contacts_before;
         MESSAGE(log.str());
 
-        CHECK(contacts_before == contacts_after);
-
-        // Re-save loaded world and memcmp
+        // Re-save loaded world and memcmp (no Update — tests save/load fidelity)
         MemStream stream2;
         world2.Save(stream2);
         CHECK(stream.size() == stream2.size());
         CHECK(std::memcmp(stream.data(), stream2.data(), stream.size()) == 0);
+
+        // After update, loaded world should still produce contacts
+        world2.Update();
+        CHECK(world2.GetContacts().size() > 0);
     }
 
     TEST_CASE("save load large world") {
@@ -1856,5 +1855,284 @@ TEST_SUITE("DebugDraw") {
         CHECK(std::abs(call.pos.x - 11.0f) < 0.01f);
         CHECK(std::abs(call.pos.y - 5.0f) < 0.01f);
         CHECK(std::abs(call.pos.z - 3.0f) < 0.01f);
+    }
+}
+
+// ============================================================================
+// Collision Resolution tests
+// ============================================================================
+
+TEST_SUITE("Collision Resolution") {
+    // Helper: set up layer/mask for a group
+    static void SetLayerMask(World& world, Identifier group_id) {
+        world.GetShapeGroup(group_id).layer = 1;
+        world.GetShapeGroup(group_id).mask = 1;
+    }
+
+    TEST_CASE("trigger contacts generated but not resolved") {
+        World world;
+        auto b1 = world.CreateBody();
+        auto b2 = world.CreateBody();
+
+        // Overlap: distance 3, sum radii 4 => depth 1
+        world.GetBody(b2).position = Vec3(Unit{3}, Unit{0}, Unit{0});
+
+        auto g1 = world.AddShapeGroup(b1);
+        auto g2 = world.AddShapeGroup(b2);
+        SetLayerMask(world, g1);
+        SetLayerMask(world, g2);
+
+        // Mark one group as trigger
+        world.GetShapeGroup(g1).is_trigger = true;
+
+        auto s1 = world.AddShape(g1, Shape::Sphere);
+        auto s2 = world.AddShape(g2, Shape::Sphere);
+        world.GetSphere(world.GetShape(s1).shape_type_id).radius = Unit{2};
+        world.GetSphere(world.GetShape(s2).shape_type_id).radius = Unit{2};
+
+        Vec3 pos1_before = world.GetBody(b1).position;
+        Vec3 pos2_before = world.GetBody(b2).position;
+
+        world.Update();
+
+        // Contact exists and is flagged as trigger
+        auto& contacts = world.GetContacts();
+        REQUIRE(contacts.size() == 1);
+        CHECK(contacts[0].is_trigger == true);
+
+        // Positions unchanged (no resolution)
+        CHECK(world.GetBody(b1).position == pos1_before);
+        CHECK(world.GetBody(b2).position == pos2_before);
+    }
+
+    TEST_CASE("dynamic vs static resolution") {
+        World world;
+        auto b_dyn = world.CreateBody();
+        auto b_stat = world.CreateBody();
+
+        // Dynamic sphere at origin, static OBB at (2,0,0)
+        world.GetBody(b_stat).is_static = true;
+        world.GetBody(b_stat).position = Vec3(Unit{2}, Unit{0}, Unit{0});
+
+        auto g_dyn = world.AddShapeGroup(b_dyn);
+        auto g_stat = world.AddShapeGroup(b_stat);
+        SetLayerMask(world, g_dyn);
+        SetLayerMask(world, g_stat);
+
+        auto s_dyn = world.AddShape(g_dyn, Shape::Sphere);
+        auto s_stat = world.AddShape(g_stat, Shape::OBB);
+        world.GetSphere(world.GetShape(s_dyn).shape_type_id).radius = Unit{2};
+        auto& obb = world.GetOBB(world.GetShape(s_stat).shape_type_id);
+        obb.half_extents = Vec3(Unit{1}, Unit{1}, Unit{1});
+
+        // Sphere at 0 r=2, OBB at 2 half=1 => overlap from 0+2=2 to 2-1=1, depth=1
+        world.Update();
+
+        auto& contacts = world.GetContacts();
+        REQUIRE(contacts.size() == 1);
+        CHECK(contacts[0].is_trigger == false);
+
+        // Dynamic body should have been pushed away from static
+        // Static should not have moved
+        CHECK(world.GetBody(b_stat).position == Vec3(Unit{2}, Unit{0}, Unit{0}));
+        // Dynamic sphere should have moved in -normal direction (away from OBB)
+        CHECK(world.GetBody(b_dyn).position.x < Unit{0});
+    }
+
+    TEST_CASE("dynamic vs dynamic resolution") {
+        World world;
+        auto b1 = world.CreateBody();
+        auto b2 = world.CreateBody();
+
+        // Two dynamic spheres overlapping
+        world.GetBody(b1).position = Vec3(Unit{0}, Unit{0}, Unit{0});
+        world.GetBody(b2).position = Vec3(Unit{3}, Unit{0}, Unit{0});
+
+        auto g1 = world.AddShapeGroup(b1);
+        auto g2 = world.AddShapeGroup(b2);
+        SetLayerMask(world, g1);
+        SetLayerMask(world, g2);
+
+        auto s1 = world.AddShape(g1, Shape::Sphere);
+        auto s2 = world.AddShape(g2, Shape::Sphere);
+        world.GetSphere(world.GetShape(s1).shape_type_id).radius = Unit{2};
+        world.GetSphere(world.GetShape(s2).shape_type_id).radius = Unit{2};
+
+        // depth = (2+2) - 3 = 1
+        world.Update();
+
+        // Both should have moved apart (equal split)
+        CHECK(world.GetBody(b1).position.x < Unit{0});
+        CHECK(world.GetBody(b2).position.x > Unit{3});
+    }
+
+    TEST_CASE("multi-shape resolution") {
+        World world;
+        auto b1 = world.CreateBody();
+        auto b2 = world.CreateBody();
+
+        world.GetBody(b2).position = Vec3(Unit{3}, Unit{0}, Unit{0});
+
+        auto g1 = world.AddShapeGroup(b1);
+        auto g2 = world.AddShapeGroup(b2);
+        SetLayerMask(world, g1);
+        SetLayerMask(world, g2);
+
+        // Body 1 has 2 sphere shapes in one group
+        auto s1a = world.AddShape(g1, Shape::Sphere);
+        auto s1b = world.AddShape(g1, Shape::Sphere);
+        world.GetSphere(world.GetShape(s1a).shape_type_id).radius = Unit{2};
+        world.GetSphere(world.GetShape(s1b).shape_type_id).center = Vec3(Unit{0}, Unit{1}, Unit{0});
+        world.GetSphere(world.GetShape(s1b).shape_type_id).radius = Unit{2};
+
+        auto s2 = world.AddShape(g2, Shape::Sphere);
+        world.GetSphere(world.GetShape(s2).shape_type_id).radius = Unit{2};
+
+        world.Update();
+
+        // Should have multiple contacts (one per shape pair that collides)
+        auto& contacts = world.GetContacts();
+        CHECK(contacts.size() >= 2);
+
+        // Both bodies should have been pushed apart
+        CHECK(world.GetBody(b1).position.x < Unit{0});
+        CHECK(world.GetBody(b2).position.x > Unit{3});
+    }
+
+    TEST_CASE("resting stability") {
+        World world;
+        auto b_sphere = world.CreateBody();
+        auto b_floor = world.CreateBody();
+
+        // Floor: static OBB at y=-1 (top face at y=0)
+        world.GetBody(b_floor).is_static = true;
+        world.GetBody(b_floor).position = Vec3(Unit{0}, Unit{-1}, Unit{0});
+
+        // Sphere: dynamic, sitting on floor. Center at y=1 (bottom at y=0, just touching)
+        // Start slightly inside to test stability
+        world.GetBody(b_sphere).position = Vec3(Unit{0}, Unit{1}, Unit{0});
+        world.GetBody(b_sphere).acceleration = Vec3(Unit{0}, Unit{-10}, Unit{0}); // gravity
+
+        auto g_sphere = world.AddShapeGroup(b_sphere);
+        auto g_floor = world.AddShapeGroup(b_floor);
+        SetLayerMask(world, g_sphere);
+        SetLayerMask(world, g_floor);
+
+        auto s_sphere = world.AddShape(g_sphere, Shape::Sphere);
+        world.GetSphere(world.GetShape(s_sphere).shape_type_id).radius = Unit{1};
+
+        auto s_floor = world.AddShape(g_floor, Shape::OBB);
+        auto& obb = world.GetOBB(world.GetShape(s_floor).shape_type_id);
+        obb.half_extents = Vec3(Unit{10}, Unit{1}, Unit{10});
+
+        // Run 60 frames
+        for (int i = 0; i < 60; i++) {
+            world.Update();
+        }
+
+        // Sphere should stay near the surface (y ~= 1, within some tolerance)
+        Unit sphere_y = world.GetBody(b_sphere).position.y;
+        Unit surface_y = Unit{1}; // sphere center should be at r=1 above floor top at y=0
+        Unit diff = GekkoMath::abs(sphere_y - surface_y);
+        // Allow slop + some tolerance for fixed-point
+        CHECK(diff < Unit{1});
+        // Should not have fallen through
+        CHECK(sphere_y > Unit{0});
+    }
+
+    TEST_CASE("velocity killed on collision") {
+        World world;
+        auto b1 = world.CreateBody();
+        auto b2 = world.CreateBody();
+
+        world.GetBody(b1).position = Vec3(Unit{0}, Unit{0}, Unit{0});
+        world.GetBody(b2).position = Vec3(Unit{3}, Unit{0}, Unit{0});
+        // b1 moving toward b2
+        world.GetBody(b1).velocity = Vec3(Unit{5}, Unit{0}, Unit{0});
+
+        auto g1 = world.AddShapeGroup(b1);
+        auto g2 = world.AddShapeGroup(b2);
+        SetLayerMask(world, g1);
+        SetLayerMask(world, g2);
+
+        auto s1 = world.AddShape(g1, Shape::Sphere);
+        auto s2 = world.AddShape(g2, Shape::Sphere);
+        world.GetSphere(world.GetShape(s1).shape_type_id).radius = Unit{2};
+        world.GetSphere(world.GetShape(s2).shape_type_id).radius = Unit{2};
+
+        world.GetBody(b2).is_static = true;
+
+        world.Update();
+
+        // After collision, b1's velocity along x should be reduced (approaching velocity killed)
+        // Normal points from b1 toward b2 (+x direction)
+        // Approaching velocity was positive along normal, should be zeroed
+        CHECK(world.GetBody(b1).velocity.x <= Unit{0});
+    }
+
+    TEST_CASE("capsule in corner stays above floor") {
+        World world;
+        Vec3 gravity(Unit{0}, Unit{-10}, Unit{0});
+
+        // Floor: top surface at y=0
+        auto b_floor = world.CreateBody();
+        world.GetBody(b_floor).is_static = true;
+        world.GetBody(b_floor).position = Vec3(Unit{0}, Unit{-1}, Unit{0});
+        auto g_floor = world.AddShapeGroup(b_floor);
+        SetLayerMask(world, g_floor);
+        auto s_floor = world.AddShape(g_floor, Shape::OBB);
+        auto& floor_obb = world.GetOBB(world.GetShape(s_floor).shape_type_id);
+        floor_obb.half_extents = Vec3(Unit{20}, Unit{1}, Unit{20});
+
+        // Back wall at z=-11
+        auto b_wall1 = world.CreateBody();
+        world.GetBody(b_wall1).is_static = true;
+        world.GetBody(b_wall1).position = Vec3(Unit{0}, Unit{2}, Unit{-11});
+        auto g_wall1 = world.AddShapeGroup(b_wall1);
+        SetLayerMask(world, g_wall1);
+        auto s_wall1 = world.AddShape(g_wall1, Shape::OBB);
+        auto& wall1_obb = world.GetOBB(world.GetShape(s_wall1).shape_type_id);
+        wall1_obb.half_extents = Vec3(Unit{20}, Unit{4}, Unit{1});
+
+        // Left wall at x=-11
+        auto b_wall2 = world.CreateBody();
+        world.GetBody(b_wall2).is_static = true;
+        world.GetBody(b_wall2).position = Vec3(Unit{-11}, Unit{2}, Unit{0});
+        auto g_wall2 = world.AddShapeGroup(b_wall2);
+        SetLayerMask(world, g_wall2);
+        auto s_wall2 = world.AddShape(g_wall2, Shape::OBB);
+        auto& wall2_obb = world.GetOBB(world.GetShape(s_wall2).shape_type_id);
+        wall2_obb.half_extents = Vec3(Unit{1}, Unit{4}, Unit{20});
+
+        // Capsule: place in the corner at (-9, 2, -9)
+        auto b_cap = world.CreateBody();
+        world.GetBody(b_cap).position = Vec3(Unit{-9}, Unit{2}, Unit{-9});
+        world.GetBody(b_cap).acceleration = gravity;
+        auto g_cap = world.AddShapeGroup(b_cap);
+        SetLayerMask(world, g_cap);
+        auto s_cap = world.AddShape(g_cap, Shape::Capsule);
+        auto& cap = world.GetCapsule(world.GetShape(s_cap).shape_type_id);
+        cap.start = Vec3(Unit{-1}, Unit{-1}, Unit{0});
+        cap.end = Vec3(Unit{1}, Unit{1}, Unit{0});
+        cap.radius = Unit{1};
+
+        // Record start position
+        Vec3 start_pos = world.GetBody(b_cap).position;
+        MESSAGE("start y=" << static_cast<float>(start_pos.y));
+
+        // Run 120 frames
+        for (int i = 0; i < 120; i++) {
+            world.Update();
+        }
+
+        Vec3 end_pos = world.GetBody(b_cap).position;
+        MESSAGE("end y=" << static_cast<float>(end_pos.y));
+        MESSAGE("end x=" << static_cast<float>(end_pos.x));
+        MESSAGE("end z=" << static_cast<float>(end_pos.z));
+
+        // Capsule bottom = body.y + capsule.start.y - radius = body.y - 1 - 1 = body.y - 2
+        // Should stay above floor (y=0): body.y - 2 >= -slop => body.y >= 2 - slop
+        // Allow some tolerance for fixed-point
+        CHECK(end_pos.y > Unit{1});
     }
 }
